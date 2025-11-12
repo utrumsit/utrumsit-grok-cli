@@ -559,22 +559,23 @@ function ChatInterfaceWithAgent({
       </Box>
 
       {/* Command suggestions overlay */}
-      {showCommandSuggestions && (
+      {/* Command suggestions overlay - disabled for now */}
+      {/* {showCommandSuggestions && (
         <CommandSuggestions
           suggestions={commandSuggestions}
           selectedIndex={selectedCommandIndex}
           onSelect={handleCommandSelect}
         />
-      )}
+      )} */}
 
-      {/* Model selection overlay */}
-      {showModelSelection && (
+      {/* Model selection overlay - disabled for now */}
+      {/* {showModelSelection && (
         <ModelSelection
           models={availableModels}
           selectedIndex={selectedModelIndex}
           onSelect={handleModelSelect}
         />
-      )}
+      )} */}
 
       {/* Bottom status bar */}
       <Box
@@ -601,12 +602,7 @@ function ChatInterfaceWithAgent({
       </Box>
 
       {/* Show loading spinner when processing */}
-      {isProcessing && (
-        <LoadingSpinner
-          operation={isStreaming ? "thinking" : "process"}
-          message={isStreaming ? "Generating response..." : "Processing..."}
-        />
-      )}
+      {isProcessing && <LoadingSpinner />}
 
       {/* Plan mode indicator - simplified */}
       <Text dimColor>Plan Mode: Off</Text>
@@ -655,10 +651,11 @@ export function ChatInterface({
   if (isInitializing) {
     return (
       <Box flexDirection="column" paddingX={2} paddingY={1}>
-        <LoadingSpinner operation="init" message="Initializing Grok CLI..." />
-        <Text color="gray" paddingY={1}>
-          Please wait while we set up the agent...
-        </Text>
+        <LoadingSpinner
+          operation="process"
+          message="Initializing Grok CLI..."
+        />
+        <Text color="gray">Please wait while we set up the agent...</Text>
       </Box>
     );
   }
@@ -669,10 +666,8 @@ export function ChatInterface({
         <Text color="red" bold>
           ❌ Agent Initialization Failed
         </Text>
-        <Text color="yellow" paddingY={1}>
-          {apiKeyError}
-        </Text>
-        <ApiKeyInput onSuccess={() => setApiKeyError(null)} />
+        <Text color="yellow">{apiKeyError}</Text>
+        <ApiKeyInput onApiKeySet={() => setApiKeyError(null)} />
       </Box>
     );
   }
@@ -683,7 +678,7 @@ export function ChatInterface({
         <Text color="yellow" bold>
           ⚠️ No Agent Available
         </Text>
-        <Text color="gray" paddingY={1}>
+        <Text color="gray">
           Please provide an agent instance or ensure proper initialization.
         </Text>
       </Box>
