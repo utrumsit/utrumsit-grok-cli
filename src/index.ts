@@ -3,7 +3,7 @@ import { render } from "ink";
 import { program } from "commander";
 import * as dotenv from "dotenv";
 import { GrokAgent } from "./agent/grok-agent.js";
-import ChatInterface from "./ui/components/chat-interface.js";
+import { ChatInterface } from "./ui/components/chat-interface.js";
 import { getSettingsManager } from "./utils/settings-manager.js";
 import { ConfirmationService } from "./utils/confirmation-service.js";
 import { createMCPCommand } from "./commands/mcp.js";

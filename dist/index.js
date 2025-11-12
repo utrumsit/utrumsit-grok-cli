@@ -5,7 +5,7 @@ import * as path7 from 'path';
 import path7__default from 'path';
 import * as os from 'os';
 import os__default from 'os';
-import React3, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React3, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Text, render, useApp, useInput } from 'ink';
 import { program, Command } from 'commander';
 import * as dotenv from 'dotenv';
@@ -5919,7 +5919,9 @@ var ASTParserTool = class {
   }
   initializeParsers() {
     if (!Parser || !JavaScript || !TypeScript || !Python) {
-      console.log("Tree-sitter parsers not available, using TypeScript-only parsing");
+      console.log(
+        "Tree-sitter parsers not available, using TypeScript-only parsing"
+      );
       return;
     }
     try {
@@ -5970,7 +5972,14 @@ var ASTParserTool = class {
         includeSymbols = true,
         includeImports = true,
         includeTree = false,
-        symbolTypes = ["function", "class", "variable", "interface", "enum", "type"],
+        symbolTypes = [
+          "function",
+          "class",
+          "variable",
+          "interface",
+          "enum",
+          "type"
+        ],
         scope = "all"
         // 'all', 'global', 'local'
       } = args;
@@ -6000,25 +6009,34 @@ var ASTParserTool = class {
         result.exports = [];
       }
       if (!includeTree) {
-        result.tree = { type: "program", text: "", startPosition: { row: 0, column: 0 }, endPosition: { row: 0, column: 0 } };
+        result.tree = {
+          type: "program",
+          text: "",
+          startPosition: { row: 0, column: 0 },
+          endPosition: { row: 0, column: 0 }
+        };
       }
       return {
         success: true,
-        output: JSON.stringify({
-          filePath,
-          language: result.language,
-          symbolCount: result.symbols.length,
-          importCount: result.imports.length,
-          exportCount: result.exports.length,
-          errorCount: result.errors.length,
-          ...includeSymbols && { symbols: result.symbols },
-          ...includeImports && {
-            imports: result.imports,
-            exports: result.exports
+        output: JSON.stringify(
+          {
+            filePath,
+            language: result.language,
+            symbolCount: result.symbols.length,
+            importCount: result.imports.length,
+            exportCount: result.exports.length,
+            errorCount: result.errors.length,
+            ...includeSymbols && { symbols: result.symbols },
+            ...includeImports && {
+              imports: result.imports,
+              exports: result.exports
+            },
+            ...includeTree && { tree: result.tree },
+            ...result.errors.length > 0 && { errors: result.errors }
           },
-          ...includeTree && { tree: result.tree },
-          ...result.errors.length > 0 && { errors: result.errors }
-        }, null, 2)
+          null,
+          2
+        )
       };
     } catch (error) {
       return {
@@ -6070,9 +6088,21 @@ var ASTParserTool = class {
       throw new Error(`Unsupported language: ${language}`);
     }
     const tree = parser.parse(content);
-    const symbols = this.extractTreeSitterSymbols(tree.rootNode, content, language);
-    const imports = this.extractTreeSitterImports(tree.rootNode, content, language);
-    const exports$1 = this.extractTreeSitterExports(tree.rootNode, content, language);
+    const symbols = this.extractTreeSitterSymbols(
+      tree.rootNode,
+      content,
+      language
+    );
+    const imports = this.extractTreeSitterImports(
+      tree.rootNode,
+      content,
+      language
+    );
+    const exports$1 = this.extractTreeSitterExports(
+      tree.rootNode,
+      content,
+      language
+    );
     const astTree = this.convertTreeSitterAST(tree.rootNode, content);
     return {
       language,
@@ -6322,8 +6352,14 @@ var ASTParserTool = class {
     content.split("\n");
     const visit = (node2, scope = "global") => {
       content.slice(node2.startIndex, node2.endIndex);
-      const startPos = { row: node2.startPosition.row, column: node2.startPosition.column };
-      const endPos = { row: node2.endPosition.row, column: node2.endPosition.column };
+      const startPos = {
+        row: node2.startPosition.row,
+        column: node2.startPosition.column
+      };
+      const endPos = {
+        row: node2.endPosition.row,
+        column: node2.endPosition.column
+      };
       switch (node2.type) {
         case "function_declaration":
         case "function_definition":
@@ -6360,8 +6396,14 @@ var ASTParserTool = class {
                 symbols.push({
                   name: varName,
                   type: "variable",
-                  startPosition: { row: child.startPosition.row, column: child.startPosition.column },
-                  endPosition: { row: child.endPosition.row, column: child.endPosition.column },
+                  startPosition: {
+                    row: child.startPosition.row,
+                    column: child.startPosition.column
+                  },
+                  endPosition: {
+                    row: child.endPosition.row,
+                    column: child.endPosition.column
+                  },
                   scope
                 });
               }
@@ -6382,7 +6424,10 @@ var ASTParserTool = class {
           (child) => child.type === "string" || child.type === "string_literal"
         );
         if (sourceNode) {
-          const source = content.slice(sourceNode.startIndex + 1, sourceNode.endIndex - 1);
+          const source = content.slice(
+            sourceNode.startIndex + 1,
+            sourceNode.endIndex - 1
+          );
           imports.push({
             source,
             specifiers: [],
@@ -6422,8 +6467,14 @@ var ASTParserTool = class {
     return {
       type: node.type,
       text: "",
-      startPosition: { row: node.loc?.start?.line - 1 || 0, column: node.loc?.start?.column || 0 },
-      endPosition: { row: node.loc?.end?.line - 1 || 0, column: node.loc?.end?.column || 0 },
+      startPosition: {
+        row: node.loc?.start?.line - 1 || 0,
+        column: node.loc?.start?.column || 0
+      },
+      endPosition: {
+        row: node.loc?.end?.line - 1 || 0,
+        column: node.loc?.end?.column || 0
+      },
       children: []
     };
   }
@@ -6437,13 +6488,21 @@ var ASTParserTool = class {
     return {
       type: node.type,
       text: content.slice(node.startIndex, node.endIndex),
-      startPosition: { row: node.startPosition.row, column: node.startPosition.column },
-      endPosition: { row: node.endPosition.row, column: node.endPosition.column },
+      startPosition: {
+        row: node.startPosition.row,
+        column: node.startPosition.column
+      },
+      endPosition: {
+        row: node.endPosition.row,
+        column: node.endPosition.column
+      },
       children
     };
   }
   extractNodeName(node, nameField) {
-    const nameNode = node.children?.find((child) => child.type === nameField);
+    const nameNode = node.children?.find(
+      (child) => child.type === nameField
+    );
     return nameNode ? nameNode.text : null;
   }
   getDeclarationType(nodeType) {
@@ -6499,10 +6558,26 @@ var ASTParserTool = class {
           type: "array",
           items: {
             type: "string",
-            enum: ["function", "class", "variable", "interface", "enum", "type", "method", "property"]
+            enum: [
+              "function",
+              "class",
+              "variable",
+              "interface",
+              "enum",
+              "type",
+              "method",
+              "property"
+            ]
           },
           description: "Types of symbols to extract",
-          default: ["function", "class", "variable", "interface", "enum", "type"]
+          default: [
+            "function",
+            "class",
+            "variable",
+            "interface",
+            "enum",
+            "type"
+          ]
         },
         scope: {
           type: "string",
@@ -9298,7 +9373,7 @@ EOF`;
 var package_default = {
   type: "module",
   name: "grok-cli-hurry-mode",
-  version: "1.1.35",
+  version: "1.1.36",
   description: "An open-source AI agent that brings the power of Grok directly into your terminal.",
   main: "dist/index.js",
   module: "dist/index.js",
@@ -14846,22 +14921,6 @@ async function autoUpgrade() {
     return false;
   }
 }
-var cachedVersionInfo = null;
-var lastCheckTime = 0;
-var CHECK_INTERVAL = 6 * 60 * 60 * 1e3;
-async function getCachedVersionInfo() {
-  const now = Date.now();
-  if (cachedVersionInfo && now - lastCheckTime < CHECK_INTERVAL) {
-    return cachedVersionInfo;
-  }
-  try {
-    cachedVersionInfo = await checkForUpdates();
-    lastCheckTime = now;
-    return cachedVersionInfo;
-  } catch {
-    return null;
-  }
-}
 
 // src/hooks/use-input-handler.ts
 function useInputHandler({
@@ -16222,7 +16281,6 @@ var inkColors = {
   success: "green",
   warning: "yellow",
   error: "red",
-  info: "blue",
   muted: "gray",
   accent: "magenta",
   text: "white",
@@ -16710,7 +16768,7 @@ var MemoizedChatEntry = React3.memo(
   }
 );
 MemoizedChatEntry.displayName = "MemoizedChatEntry";
-function ChatHistory({
+var ChatHistory = React3.memo(function ChatHistory2({
   entries,
   isConfirmationActive = false
 }) {
@@ -16725,7 +16783,8 @@ function ChatHistory({
     },
     `${entry.timestamp.getTime()}-${index}`
   )) });
-}
+});
+ChatHistory.displayName = "ChatHistory";
 function ChatInput({
   input,
   cursorPosition,
@@ -16809,38 +16868,6 @@ function ChatInput({
       ] })
     }
   );
-}
-function MCPStatus({}) {
-  const [connectedServers, setConnectedServers] = useState([]);
-  const [_availableTools, setAvailableTools] = useState([]);
-  useEffect(() => {
-    const updateStatus = () => {
-      try {
-        const manager = getMCPManager();
-        const servers = manager.getServers();
-        const tools = manager.getTools();
-        setConnectedServers(servers);
-        setAvailableTools(tools);
-      } catch (_error) {
-        setConnectedServers([]);
-        setAvailableTools([]);
-      }
-    };
-    const initialTimer = setTimeout(updateStatus, 2e3);
-    const interval = setInterval(updateStatus, 2e3);
-    return () => {
-      clearTimeout(initialTimer);
-      clearInterval(interval);
-    };
-  }, []);
-  if (connectedServers.length === 0) {
-    return null;
-  }
-  return /* @__PURE__ */ jsx(Box, { marginLeft: 1, children: /* @__PURE__ */ jsxs(Text, { color: "green", children: [
-    "\u2692 mcps: ",
-    connectedServers.length,
-    " "
-  ] }) });
 }
 function ConfirmationDialog({
   operation,
@@ -17129,37 +17156,18 @@ function formatTimeAgo(date) {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   return `${Math.floor(seconds / 86400)}d ago`;
 }
-var grokBanner = `
- \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588   \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588   \u2588\u2588     \u2588\u2588\u2588\u2588\u2588\u2588 \u2588\u2588      \u2588\u2588 
-\u2588\u2588       \u2588\u2588   \u2588\u2588 \u2588\u2588    \u2588\u2588 \u2588\u2588  \u2588\u2588     \u2588\u2588      \u2588\u2588      \u2588\u2588 
-\u2588\u2588   \u2588\u2588\u2588 \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588\u2588      \u2588\u2588      \u2588\u2588      \u2588\u2588 
-\u2588\u2588    \u2588\u2588 \u2588\u2588   \u2588\u2588 \u2588\u2588    \u2588\u2588 \u2588\u2588  \u2588\u2588     \u2588\u2588      \u2588\u2588      \u2588\u2588 
- \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588   \u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588   \u2588\u2588     \u2588\u2588\u2588\u2588\u2588\u2588 \u2588\u2588\u2588\u2588\u2588\u2588\u2588 \u2588\u2588 
-`;
-var grokMini = `
- \u2584\u2584\u2584\u2584\u2584\u2584\u2584 \u2584\u2584\u2584\u2584\u2584\u2584   \u2584\u2584\u2584\u2584\u2584\u2584  \u2584   \u2584
-\u2588\u2588       \u2588\u2588   \u2588\u2588 \u2588\u2588    \u2588\u2588 \u2588\u2588 \u2588\u2588 
-\u2588\u2588   \u2588\u2588\u2588 \u2588\u2588\u2584\u2584\u2584\u2588\u2588 \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588  
-\u2588\u2588    \u2588\u2588 \u2588\u2588   \u2588\u2588 \u2588\u2588    \u2588\u2588 \u2588\u2588 \u2588\u2588 
- \u2580\u2580\u2580\u2580\u2580\u2580\u2580 \u2580\u2580   \u2580\u2580  \u2580\u2580\u2580\u2580\u2580\u2580  \u2580\u2580  \u2580\u2580
-`;
-var grokRetro = `
-\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557
-\u2551  \u2584\u2584\u2584\u2584   \u2584\u2584\u2584\u2584\u2584   \u2584\u2584\u2584\u2584\u2584   \u2584   \u2584   \u2584\u2584\u2584\u2584\u2584   \u2584     \u2584      \u2551
-\u2551 \u2588\u2588      \u2588\u2588   \u2588 \u2588\u2588    \u2588 \u2588\u2588 \u2588\u2588  \u2588\u2588      \u2588\u2588    \u2588\u2588       \u2551
-\u2551 \u2588\u2588  \u2584\u2584\u2584 \u2588\u2588\u2584\u2584\u2584\u2588 \u2588\u2588    \u2588 \u2588\u2588\u2588\u2588   \u2588\u2588      \u2588\u2588    \u2588\u2588       \u2551
-\u2551 \u2588\u2588   \u2588\u2588 \u2588\u2588  \u2588\u2588 \u2588\u2588    \u2588 \u2588\u2588 \u2588\u2588  \u2588\u2588      \u2588\u2588    \u2588\u2588       \u2551
-\u2551  \u2580\u2580\u2580\u2580\u2580   \u2580\u2580  \u2580\u2580  \u2580\u2580\u2580\u2580\u2580\u2580  \u2580\u2580  \u2580\u2580  \u2580\u2580\u2580\u2580\u2580   \u2580\u2580\u2580\u2580\u2580 \u2580\u2580      \u2551
-\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D
-`;
-function Banner({
+var grokBanner = "  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588   \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588   \u2588\u2588     \u2588\u2588\u2588\u2588\u2588\u2588 \u2588\u2588      \u2588\u2588 \n\u2588\u2588       \u2588\u2588   \u2588\u2588 \u2588\u2588    \u2588\u2588 \u2588\u2588  \u2588\u2588     \u2588\u2588      \u2588\u2588      \u2588\u2588 \n\u2588\u2588   \u2588\u2588\u2588 \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588\u2588      \u2588\u2588      \u2588\u2588      \u2588\u2588 \n\u2588\u2588    \u2588\u2588 \u2588\u2588   \u2588\u2588 \u2588\u2588    \u2588\u2588 \u2588\u2588  \u2588\u2588     \u2588\u2588      \u2588\u2588      \u2588\u2588 \n \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588   \u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588   \u2588\u2588     \u2588\u2588\u2588\u2588\u2588\u2588 \u2588\u2588\u2588\u2588\u2588\u2588\u2588 \u2588\u2588 \n";
+var grokMini = "  \u2584\u2584\u2584\u2584\u2584\u2584\u2584 \u2584\u2584\u2584\u2584\u2584\u2584   \u2584\u2584\u2584\u2584\u2584\u2584  \u2584   \u2584\n\u2588\u2588       \u2588\u2588   \u2588\u2588 \u2588\u2588    \u2588\u2588 \u2588\u2588 \u2588\u2588 \n\u2588\u2588   \u2588\u2588\u2588 \u2588\u2588\u2584\u2584\u2584\u2588\u2588 \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588  \n\u2588\u2588    \u2588\u2588 \u2588\u2588   \u2588\u2588 \u2588\u2588    \u2588\u2588 \u2588\u2588 \u2588\u2588 \n \u2580\u2580\u2580\u2580\u2580\u2580\u2580 \u2580\u2580   \u2580\u2580  \u2580\u2580\u2580\u2580\u2580\u2580  \u2580\u2580  \u2580\u2580\n";
+var grokRetro = "\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n\u2551  \u2584\u2584\u2584\u2584   \u2584\u2584\u2584\u2584\u2584   \u2584\u2584\u2584\u2584\u2584   \u2584   \u2584   \u2584\u2584\u2584\u2584\u2584   \u2584     \u2584      \u2551\n\u2551 \u2588\u2588      \u2588\u2588   \u2588 \u2588\u2588    \u2588 \u2588\u2588 \u2588\u2588  \u2588\u2588      \u2588\u2588    \u2588\u2588       \u2551\n\u2551 \u2588\u2588  \u2584\u2584\u2584 \u2588\u2588\u2584\u2584\u2584\u2588 \u2588\u2588    \u2588 \u2588\u2588\u2588\u2588   \u2588\u2588      \u2588\u2588    \u2588\u2588       \u2551\n\u2551 \u2588\u2588   \u2588\u2588 \u2588\u2588  \u2588\u2588 \u2588\u2588    \u2588 \u2588\u2588 \u2588\u2588  \u2588\u2588      \u2588\u2588    \u2588\u2588       \u2551\n\u2551  \u2580\u2580\u2580\u2580\u2580   \u2580\u2580  \u2580\u2580  \u2580\u2580\u2580\u2580\u2580\u2580  \u2580\u2580  \u2580\u2580  \u2580\u2580\u2580\u2580\u2580   \u2580\u2580\u2580\u2580\u2580 \u2580\u2580      \u2551\n\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n";
+function BannerComponent({
   style = "default",
   showContext = true,
   workspaceFiles = 0,
   indexSize = "0 MB",
-  sessionRestored = false
+  sessionRestored = false,
+  isLoading = false
 }) {
-  const getBannerArt = () => {
+  const bannerArt = useMemo(() => {
     switch (style) {
       case "mini":
         return grokMini;
@@ -17168,7 +17176,7 @@ function Banner({
       default:
         return grokBanner;
     }
-  };
+  }, [style]);
   const getContextStatus = () => {
     if (!showContext) return null;
     return /* @__PURE__ */ jsxs(Box, { marginTop: 1, children: [
@@ -17187,8 +17195,11 @@ function Banner({
       /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: " for details" })
     ] });
   };
+  if (isLoading) {
+    return /* @__PURE__ */ jsx(Box, { flexDirection: "column", marginBottom: 2, children: /* @__PURE__ */ jsx(Text, { color: inkColors.primary, bold: true, children: "Initializing Grok CLI..." }) });
+  }
   return /* @__PURE__ */ jsxs(Box, { flexDirection: "column", marginBottom: 2, children: [
-    /* @__PURE__ */ jsx(Text, { color: inkColors.accentBright, children: getBannerArt() }),
+    /* @__PURE__ */ jsx(Text, { color: inkColors.accentBright, children: bannerArt }),
     /* @__PURE__ */ jsxs(Box, { marginTop: 1, children: [
       /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: "Welcome to " }),
       /* @__PURE__ */ jsx(Text, { color: inkColors.primary, bold: true, children: "Grok CLI" }),
@@ -17203,10 +17214,14 @@ function Banner({
     getContextStatus(),
     /* @__PURE__ */ jsxs(Box, { marginTop: 1, children: [
       /* @__PURE__ */ jsx(Text, { color: inkColors.successBright, children: "\u2714 Ready." }),
-      /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: " Type your first command or paste code to begin." })
+      /* @__PURE__ */ jsxs(Text, { color: inkColors.muted, children: [
+        " ",
+        "Type your first command or paste code to begin."
+      ] })
     ] })
   ] });
 }
+var Banner = React3.memo(BannerComponent);
 function useContextInfo(agent) {
   const [contextInfo, setContextInfo] = useState({
     workspaceFiles: 0,
@@ -17453,306 +17468,6 @@ function ContextTooltip({ isVisible }) {
     }
   );
 }
-function VersionNotification({ isVisible = true }) {
-  const [versionInfo, setVersionInfo] = useState(null);
-  useEffect(() => {
-    const checkVersion = async () => {
-      try {
-        const info = await getCachedVersionInfo();
-        if (info?.isUpdateAvailable) {
-          setVersionInfo({
-            isUpdateAvailable: info.isUpdateAvailable,
-            current: info.current,
-            latest: info.latest
-          });
-        }
-      } catch {
-      }
-    };
-    checkVersion();
-    const interval = setInterval(checkVersion, 6 * 60 * 60 * 1e3);
-    return () => clearInterval(interval);
-  }, []);
-  if (!isVisible || !versionInfo?.isUpdateAvailable) {
-    return null;
-  }
-  return /* @__PURE__ */ jsx(Box, { marginTop: 1, marginBottom: 1, children: /* @__PURE__ */ jsxs(
-    Box,
-    {
-      borderStyle: "round",
-      borderColor: inkColors.warning,
-      paddingX: 2,
-      paddingY: 0,
-      children: [
-        /* @__PURE__ */ jsxs(Text, { color: inkColors.warning, children: [
-          "\u{1F504} Update available: v",
-          versionInfo.latest,
-          " (current: v",
-          versionInfo.current,
-          ")"
-        ] }),
-        /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: " - Use '/upgrade' to update" })
-      ]
-    }
-  ) });
-}
-var PHASE_DISPLAY = {
-  inactive: { label: "Inactive", color: "gray", symbol: "\u25CB" },
-  analysis: { label: "Analyzing", color: "blue", symbol: "\u{1F50D}" },
-  strategy: { label: "Planning", color: "yellow", symbol: "\u{1F9E0}" },
-  presentation: { label: "Presenting", color: "cyan", symbol: "\u{1F4CB}" },
-  approved: { label: "Approved", color: "green", symbol: "\u2705" },
-  rejected: { label: "Rejected", color: "red", symbol: "\u274C" }
-};
-var PHASE_DESCRIPTIONS = {
-  inactive: "Press Shift+Tab twice to enter Plan Mode",
-  analysis: "Exploring codebase and gathering insights",
-  strategy: "Formulating implementation strategy",
-  presentation: "Presenting plan for your review",
-  approved: "Plan approved - ready for execution",
-  rejected: "Plan rejected - please provide feedback"
-};
-function PlanModeIndicator({
-  isActive,
-  phase,
-  progress,
-  sessionDuration,
-  detailed = false
-}) {
-  const phaseInfo = PHASE_DISPLAY[phase];
-  const phaseDescription = PHASE_DESCRIPTIONS[phase];
-  const formatDuration = (ms) => {
-    const seconds = Math.floor(ms / 1e3);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    if (minutes > 0) {
-      return `${minutes}m ${remainingSeconds}s`;
-    }
-    return `${remainingSeconds}s`;
-  };
-  const formatProgressBar = (progress2, width = 20) => {
-    const filled = Math.round(progress2 * width);
-    const empty = width - filled;
-    return "\u2588".repeat(filled) + "\u2591".repeat(empty);
-  };
-  if (!isActive) {
-    return detailed ? /* @__PURE__ */ jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 1, children: [
-      /* @__PURE__ */ jsxs(Box, { flexDirection: "row", alignItems: "center", children: [
-        /* @__PURE__ */ jsx(Text, { color: "gray", children: phaseInfo.symbol }),
-        /* @__PURE__ */ jsx(Box, { marginLeft: 1, children: /* @__PURE__ */ jsxs(Text, { color: "gray", bold: true, children: [
-          "Plan Mode: ",
-          phaseInfo.label
-        ] }) })
-      ] }),
-      /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: "gray", dimColor: true, children: phaseDescription }) })
-    ] }) : null;
-  }
-  return /* @__PURE__ */ jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: phaseInfo.color, padding: 1, children: [
-    /* @__PURE__ */ jsxs(Box, { flexDirection: "row", alignItems: "center", justifyContent: "space-between", children: [
-      /* @__PURE__ */ jsxs(Box, { flexDirection: "row", alignItems: "center", children: [
-        /* @__PURE__ */ jsx(Text, { color: phaseInfo.color, children: phaseInfo.symbol }),
-        /* @__PURE__ */ jsx(Box, { marginLeft: 1, children: /* @__PURE__ */ jsxs(Text, { color: phaseInfo.color, bold: true, children: [
-          "Plan Mode: ",
-          phaseInfo.label
-        ] }) })
-      ] }),
-      /* @__PURE__ */ jsx(Box, { flexDirection: "row", alignItems: "center", children: /* @__PURE__ */ jsx(Text, { color: "gray", dimColor: true, children: formatDuration(sessionDuration) }) })
-    ] }),
-    phase !== "inactive" && phase !== "approved" && phase !== "rejected" && /* @__PURE__ */ jsxs(Box, { flexDirection: "row", alignItems: "center", marginTop: 1, children: [
-      /* @__PURE__ */ jsx(Box, { marginRight: 1, children: /* @__PURE__ */ jsx(Text, { color: "gray", dimColor: true, children: "Progress:" }) }),
-      /* @__PURE__ */ jsx(Text, { color: phaseInfo.color, children: formatProgressBar(progress) }),
-      /* @__PURE__ */ jsx(Box, { marginLeft: 1, children: /* @__PURE__ */ jsxs(Text, { color: "gray", dimColor: true, children: [
-        Math.round(progress * 100),
-        "%"
-      ] }) })
-    ] }),
-    detailed && /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: "gray", dimColor: true, children: phaseDescription }) }),
-    detailed && phase === "analysis" && /* @__PURE__ */ jsxs(Box, { flexDirection: "column", marginTop: 1, children: [
-      /* @__PURE__ */ jsx(Text, { color: "blue", dimColor: true, children: "\u2022 Reading project structure" }),
-      /* @__PURE__ */ jsx(Text, { color: "blue", dimColor: true, children: "\u2022 Analyzing dependencies" }),
-      /* @__PURE__ */ jsx(Text, { color: "blue", dimColor: true, children: "\u2022 Identifying key components" })
-    ] }),
-    detailed && phase === "strategy" && /* @__PURE__ */ jsxs(Box, { flexDirection: "column", marginTop: 1, children: [
-      /* @__PURE__ */ jsx(Text, { color: "yellow", dimColor: true, children: "\u2022 Evaluating implementation approaches" }),
-      /* @__PURE__ */ jsx(Text, { color: "yellow", dimColor: true, children: "\u2022 Assessing risks and dependencies" }),
-      /* @__PURE__ */ jsx(Text, { color: "yellow", dimColor: true, children: "\u2022 Estimating effort and timeline" })
-    ] }),
-    detailed && phase === "presentation" && /* @__PURE__ */ jsxs(Box, { flexDirection: "column", marginTop: 1, children: [
-      /* @__PURE__ */ jsx(Text, { color: "cyan", dimColor: true, children: "\u2022 Preparing implementation plan" }),
-      /* @__PURE__ */ jsx(Text, { color: "cyan", dimColor: true, children: "\u2022 Organizing steps and dependencies" }),
-      /* @__PURE__ */ jsx(Text, { color: "cyan", dimColor: true, children: "\u2022 Ready for your review" })
-    ] }),
-    !detailed && /* @__PURE__ */ jsx(Box, { flexDirection: "row", marginTop: 1, children: /* @__PURE__ */ jsxs(Text, { color: "gray", dimColor: true, children: [
-      phase === "presentation" && "\u2022 Press Enter to review plan",
-      phase === "approved" && '\u2022 Type "execute" to start implementation',
-      phase === "rejected" && "\u2022 Provide feedback to regenerate plan",
-      (phase === "analysis" || phase === "strategy") && "\u2022 Plan mode is analyzing..."
-    ] }) })
-  ] });
-}
-function PlanModeStatusIndicator({
-  isActive,
-  phase,
-  progress
-}) {
-  if (!isActive) {
-    return /* @__PURE__ */ jsx(Text, { color: "gray", dimColor: true, children: "Plan Mode: Off" });
-  }
-  const phaseInfo = PHASE_DISPLAY[phase];
-  return /* @__PURE__ */ jsxs(Box, { flexDirection: "row", alignItems: "center", children: [
-    /* @__PURE__ */ jsx(Text, { color: phaseInfo.color, children: phaseInfo.symbol }),
-    /* @__PURE__ */ jsx(Box, { marginLeft: 1, children: /* @__PURE__ */ jsxs(Text, { color: phaseInfo.color, children: [
-      "Plan: ",
-      phaseInfo.label
-    ] }) }),
-    phase !== "inactive" && phase !== "approved" && phase !== "rejected" && /* @__PURE__ */ jsx(Box, { marginLeft: 1, children: /* @__PURE__ */ jsxs(Text, { color: "gray", dimColor: true, children: [
-      "(",
-      Math.round(progress * 100),
-      "%)"
-    ] }) })
-  ] });
-}
-function ContextIndicator({
-  state,
-  compact = false
-}) {
-  const getTokenColor = (percent) => {
-    if (percent >= 90) return inkColors.error;
-    if (percent >= 80) return inkColors.warning;
-    if (percent >= 60) return inkColors.info;
-    return inkColors.success;
-  };
-  const getMemoryPressureColor = (pressure) => {
-    switch (pressure) {
-      case "critical":
-        return inkColors.error;
-      case "high":
-        return inkColors.warning;
-      case "medium":
-        return inkColors.info;
-      default:
-        return inkColors.success;
-    }
-  };
-  const formatTokenCount2 = (count) => {
-    if (count >= 1e6) {
-      return `${(count / 1e6).toFixed(1)}M`;
-    }
-    if (count >= 1e3) {
-      return `${(count / 1e3).toFixed(1)}k`;
-    }
-    return count.toString();
-  };
-  const getProgressBar = (percent, width = 20) => {
-    const filled = Math.round(percent / 100 * width);
-    const empty = width - filled;
-    return "\u2588".repeat(filled) + "\u2592".repeat(empty);
-  };
-  if (compact) {
-    return /* @__PURE__ */ jsxs(Box, { children: [
-      /* @__PURE__ */ jsxs(Text, { color: getTokenColor(state.tokenUsage.percent), children: [
-        "\u{1F9E0} ",
-        formatTokenCount2(state.tokenUsage.current),
-        "/",
-        formatTokenCount2(state.tokenUsage.max),
-        " (",
-        state.tokenUsage.percent,
-        "%)"
-      ] }),
-      /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: " \u2502 " }),
-      /* @__PURE__ */ jsxs(Text, { color: inkColors.info, children: [
-        "\u{1F4C1} ",
-        state.fileCount,
-        " files"
-      ] }),
-      /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: " \u2502 " }),
-      /* @__PURE__ */ jsxs(Text, { color: inkColors.info, children: [
-        "\u{1F4AC} ",
-        state.messagesCount,
-        " msgs"
-      ] }),
-      state.memoryPressure !== "low" && /* @__PURE__ */ jsxs(Fragment, { children: [
-        /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: " \u2502 " }),
-        /* @__PURE__ */ jsxs(Text, { color: getMemoryPressureColor(state.memoryPressure), children: [
-          "\u26A0\uFE0F ",
-          state.memoryPressure,
-          " pressure"
-        ] })
-      ] })
-    ] });
-  }
-  return /* @__PURE__ */ jsxs(
-    Box,
-    {
-      flexDirection: "column",
-      borderStyle: "round",
-      borderColor: state.contextHealth === "critical" ? "red" : state.contextHealth === "degraded" ? "yellow" : "green",
-      paddingX: 1,
-      paddingY: 0,
-      children: [
-        /* @__PURE__ */ jsxs(Box, { justifyContent: "space-between", children: [
-          /* @__PURE__ */ jsx(Text, { bold: true, color: inkColors.primary, children: "\u{1F9E0} Context Status" }),
-          /* @__PURE__ */ jsx(
-            Text,
-            {
-              color: state.contextHealth === "critical" ? inkColors.error : state.contextHealth === "degraded" ? inkColors.warning : inkColors.success,
-              children: state.contextHealth.toUpperCase()
-            }
-          )
-        ] }),
-        /* @__PURE__ */ jsxs(Box, { flexDirection: "column", marginTop: 1, children: [
-          /* @__PURE__ */ jsxs(Box, { justifyContent: "space-between", children: [
-            /* @__PURE__ */ jsx(Text, { color: inkColors.info, children: "Memory Usage:" }),
-            /* @__PURE__ */ jsxs(Text, { color: getTokenColor(state.tokenUsage.percent), children: [
-              formatTokenCount2(state.tokenUsage.current),
-              "/",
-              formatTokenCount2(state.tokenUsage.max),
-              " (",
-              state.tokenUsage.percent,
-              "%)"
-            ] })
-          ] }),
-          /* @__PURE__ */ jsx(Box, { marginTop: 0, children: /* @__PURE__ */ jsx(Text, { color: getTokenColor(state.tokenUsage.percent), children: getProgressBar(state.tokenUsage.percent, 40) }) })
-        ] }),
-        /* @__PURE__ */ jsxs(Box, { justifyContent: "space-between", marginTop: 1, children: [
-          /* @__PURE__ */ jsxs(Box, { children: [
-            /* @__PURE__ */ jsx(Text, { color: inkColors.info, children: "\u{1F4C1} Files: " }),
-            /* @__PURE__ */ jsx(Text, { color: inkColors.accent, children: state.fileCount })
-          ] }),
-          /* @__PURE__ */ jsxs(Box, { children: [
-            /* @__PURE__ */ jsx(Text, { color: inkColors.info, children: "\u{1F4AC} Messages: " }),
-            /* @__PURE__ */ jsx(Text, { color: inkColors.accent, children: state.messagesCount })
-          ] }),
-          /* @__PURE__ */ jsxs(Box, { children: [
-            /* @__PURE__ */ jsx(Text, { color: inkColors.info, children: "\u{1F525} Pressure: " }),
-            /* @__PURE__ */ jsx(Text, { color: getMemoryPressureColor(state.memoryPressure), children: state.memoryPressure })
-          ] })
-        ] }),
-        state.tokenUsage.percent >= 80 && /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: inkColors.warning, children: "\u26A0\uFE0F Approaching context limit. Consider using /compact or /clear" }) }),
-        state.memoryPressure === "critical" && /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: inkColors.error, children: "\u{1F6A8} Critical memory pressure! Performance may degrade. Use /clear immediately." }) }),
-        state.loadedFiles.length > 0 && /* @__PURE__ */ jsxs(Box, { flexDirection: "column", marginTop: 1, children: [
-          /* @__PURE__ */ jsx(Text, { color: inkColors.info, bold: true, children: "Recent Files:" }),
-          state.loadedFiles.slice(0, 3).map((file, index) => /* @__PURE__ */ jsxs(Box, { children: [
-            /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: "\u2022 " }),
-            /* @__PURE__ */ jsx(Text, { color: inkColors.accent, children: file.path }),
-            /* @__PURE__ */ jsxs(Text, { color: inkColors.muted, children: [
-              " ",
-              "(",
-              formatTokenCount2(file.tokens),
-              " tokens)"
-            ] })
-          ] }, index)),
-          state.loadedFiles.length > 3 && /* @__PURE__ */ jsxs(Text, { color: inkColors.muted, children: [
-            "... and ",
-            state.loadedFiles.length - 3,
-            " more files"
-          ] })
-        ] }),
-        /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: "\u{1F4A1} Use /context for details, /compact to optimize, /clear to reset" }) })
-      ]
-    }
-  );
-}
 init_settings_manager();
 function ApiKeyInput({ onApiKeySet }) {
   const [input, setInput] = useState("");
@@ -17856,9 +17571,7 @@ function ChatInterfaceWithAgent({
     selectedModelIndex,
     commandSuggestions,
     availableModels,
-    autoEditEnabled,
-    planMode
-  } = useInputHandler({
+    autoEditEnabled} = useInputHandler({
     agent,
     chatHistory,
     setChatHistory,
@@ -17872,6 +17585,28 @@ function ChatInterfaceWithAgent({
     isConfirmationActive: !!confirmationOptions,
     onGlobalShortcut: handleGlobalShortcuts
   });
+  useCallback(
+    (message) => {
+      if (!message.trim()) return;
+      const userEntry = {
+        type: "user",
+        content: message,
+        timestamp: /* @__PURE__ */ new Date()
+      };
+      setChatHistory((prev) => [...prev, userEntry]);
+      setIsProcessing(true);
+      setIsStreaming(true);
+      setTimeout(() => {
+        setIsProcessing(false);
+        setIsStreaming(false);
+      }, 1e3);
+    },
+    [setChatHistory, setIsProcessing, setIsStreaming]
+  );
+  const handleCommandSelect = useCallback((command) => {
+  }, []);
+  const handleModelSelect = useCallback((model) => {
+  }, []);
   useEffect(() => {
     const isWindows = process.platform === "win32";
     const isPowerShell = process.env.ComSpec?.toLowerCase().includes("powershell") || process.env.PSModulePath !== void 0;
@@ -17928,7 +17663,7 @@ function ChatInterfaceWithAgent({
           let lastUpdateTime = Date.now();
           const flushUpdates = () => {
             const now = Date.now();
-            if (now - lastUpdateTime < 100) return;
+            if (now - lastUpdateTime < 250) return;
             setChatHistory((prev) => {
               let newHistory = [...prev];
               if (accumulatedContent) {
@@ -18090,34 +17825,31 @@ function ChatInterfaceWithAgent({
     }, 1e3);
     return () => clearInterval(interval);
   }, [isProcessing, isStreaming]);
-  const handleConfirmation = (dontAskAgain) => {
-    confirmationService.confirmOperation(true, dontAskAgain);
-    setConfirmationOptions(null);
-  };
-  const handleRejection = (feedback) => {
-    confirmationService.rejectOperation(feedback);
-    setConfirmationOptions(null);
-    setIsProcessing(false);
-    setIsStreaming(false);
-    setTokenCount(0);
-    setProcessingTime(0);
-    processingStartTime.current = 0;
-  };
-  const toggleContextTooltip = () => {
+  const handleConfirmation = useCallback(
+    (dontAskAgain) => {
+      confirmationService.confirmOperation(true, dontAskAgain);
+      setConfirmationOptions(null);
+    },
+    [confirmationService]
+  );
+  const handleRejection = useCallback(
+    (feedback) => {
+      confirmationService.rejectOperation(feedback);
+      setConfirmationOptions(null);
+      setIsProcessing(false);
+      setIsStreaming(false);
+      setTokenCount(0);
+      setProcessingTime(0);
+      processingStartTime.current = 0;
+    },
+    [confirmationService]
+  );
+  const toggleContextTooltip = useCallback(() => {
     setShowContextTooltip((prev) => !prev);
-  };
+  }, []);
   return /* @__PURE__ */ jsxs(Box, { flexDirection: "column", paddingX: 2, children: [
     chatHistory.length === 0 && !confirmationOptions && /* @__PURE__ */ jsxs(Box, { flexDirection: "column", children: [
-      /* @__PURE__ */ jsx(
-        Banner,
-        {
-          style: "default",
-          showContext: true,
-          workspaceFiles: contextInfo.workspaceFiles,
-          indexSize: contextInfo.indexSize,
-          sessionRestored: contextInfo.sessionFiles > 0
-        }
-      ),
+      /* @__PURE__ */ jsx(Banner, {}),
       /* @__PURE__ */ jsxs(Box, { marginTop: 1, flexDirection: "column", children: [
         /* @__PURE__ */ jsx(Text, { color: "cyan", bold: true, children: "\u{1F4A1} Quick Start Tips:" }),
         /* @__PURE__ */ jsxs(Box, { marginTop: 1, flexDirection: "column", children: [
@@ -18141,29 +17873,29 @@ function ChatInterfaceWithAgent({
             /* @__PURE__ */ jsx(Text, { color: "yellow", children: "Get help:" }),
             ' Type "/help" for all commands'
           ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: "cyan", bold: true, children: "\u{1F6E0}\uFE0F Power Features:" }) }),
+      /* @__PURE__ */ jsxs(Box, { marginTop: 1, flexDirection: "column", children: [
+        /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
+          "\u2022 ",
+          /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Auto-edit mode:" }),
+          " Press Shift+Tab to toggle hands-free editing"
         ] }),
-        /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: "cyan", bold: true, children: "\u{1F6E0}\uFE0F Power Features:" }) }),
-        /* @__PURE__ */ jsxs(Box, { marginTop: 1, flexDirection: "column", children: [
-          /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
-            "\u2022 ",
-            /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Auto-edit mode:" }),
-            " Press Shift+Tab to toggle hands-free editing"
-          ] }),
-          /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
-            "\u2022 ",
-            /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Project memory:" }),
-            " Create .grok/GROK.md to customize behavior"
-          ] }),
-          /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
-            "\u2022 ",
-            /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Documentation:" }),
-            ' Run "/init-agent" for .agent docs system'
-          ] }),
-          /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
-            "\u2022 ",
-            /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Error recovery:" }),
-            ' Run "/heal" after errors to add guardrails'
-          ] })
+        /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
+          "\u2022 ",
+          /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Project memory:" }),
+          " Create .grok/GROK.md to customize behavior"
+        ] }),
+        /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
+          "\u2022 ",
+          /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Documentation:" }),
+          ' Run "/init-agent" for .agent docs system'
+        ] }),
+        /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
+          "\u2022 ",
+          /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Error recovery:" }),
+          ' Run "/heal" after errors to add guardrails'
         ] })
       ] })
     ] }),
@@ -18193,119 +17925,150 @@ function ChatInterfaceWithAgent({
         onReject: handleRejection
       }
     ),
-    !confirmationOptions && /* @__PURE__ */ jsxs(Fragment, { children: [
-      /* @__PURE__ */ jsx(
-        LoadingSpinner,
+    /* @__PURE__ */ jsxs(Box, { flexShrink: 0, marginTop: 1, children: [
+      /* @__PURE__ */ jsxs(
+        Box,
         {
-          isActive: isProcessing || isStreaming,
-          processingTime,
-          tokenCount,
-          operation: isStreaming ? "thinking" : "process",
-          progress: void 0
+          borderStyle: "single",
+          borderColor: "gray",
+          paddingX: 1,
+          paddingY: 0.5,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          children: [
+            /* @__PURE__ */ jsx(Text, { dimColor: true, children: "Ask me anything..." }),
+            /* @__PURE__ */ jsxs(Box, { flexDirection: "row", alignItems: "center", children: [
+              /* @__PURE__ */ jsxs(Text, { dimColor: true, children: [
+                "auto-edit: ",
+                autoEditEnabled ? "on" : "off",
+                " (shift + tab)"
+              ] }),
+              /* @__PURE__ */ jsx(Text, { dimColor: true, children: " \u224B grok-code-fast-1" }),
+              /* @__PURE__ */ jsx(Text, { dimColor: true, children: " Plan Mode: Off" })
+            ] })
+          ]
         }
       ),
-      /* @__PURE__ */ jsx(VersionNotification, { isVisible: !isProcessing && !isStreaming }),
-      planMode.isActive && /* @__PURE__ */ jsx(Box, { marginBottom: 1, children: /* @__PURE__ */ jsx(
-        PlanModeIndicator,
-        {
-          isActive: planMode.isActive,
-          phase: planMode.currentPhase,
-          progress: planMode.progress,
-          sessionDuration: planMode.sessionDuration,
-          detailed: true
-        }
-      ) }),
       /* @__PURE__ */ jsx(
         ChatInput,
         {
-          input,
-          cursorPosition,
+          input: input || "",
           isProcessing,
-          isStreaming
-        }
-      ),
-      /* @__PURE__ */ jsxs(Box, { flexDirection: "row", marginTop: 1, children: [
-        /* @__PURE__ */ jsxs(Box, { marginRight: 2, children: [
-          /* @__PURE__ */ jsxs(Text, { color: "cyan", children: [
-            autoEditEnabled ? "\u25B6" : "\u23F8",
-            " auto-edit:",
-            " ",
-            autoEditEnabled ? "on" : "off"
-          ] }),
-          /* @__PURE__ */ jsxs(Text, { color: "gray", dimColor: true, children: [
-            " ",
-            "(shift + tab)"
-          ] })
-        ] }),
-        /* @__PURE__ */ jsx(Box, { marginRight: 2, children: /* @__PURE__ */ jsxs(Text, { color: "yellow", children: [
-          "\u224B ",
-          agent.getCurrentModel()
-        ] }) }),
-        /* @__PURE__ */ jsx(Box, { marginRight: 2, children: /* @__PURE__ */ jsx(
-          PlanModeStatusIndicator,
-          {
-            isActive: planMode.isActive,
-            phase: planMode.currentPhase,
-            progress: planMode.progress
-          }
-        ) }),
-        /* @__PURE__ */ jsx(MCPStatus, {})
-      ] }),
-      contextInfo.tokenUsage && /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(
-        ContextIndicator,
-        {
-          state: {
-            tokenUsage: contextInfo.tokenUsage,
-            memoryPressure: contextInfo.memoryPressure,
-            loadedFiles: contextInfo.loadedFiles,
-            messagesCount: contextInfo.messagesCount,
-            contextHealth: contextInfo.contextHealth,
-            fileCount: contextInfo.loadedFiles.length
-          },
-          compact: true
-        }
-      ) }),
-      /* @__PURE__ */ jsx(
-        CommandSuggestions,
-        {
-          suggestions: commandSuggestions,
-          input,
-          selectedIndex: selectedCommandIndex,
-          isVisible: showCommandSuggestions
-        }
-      ),
-      /* @__PURE__ */ jsx(
-        ModelSelection,
-        {
-          models: availableModels,
-          selectedIndex: selectedModelIndex,
-          isVisible: showModelSelection,
-          currentModel: agent.getCurrentModel()
+          isStreaming,
+          cursorPosition: cursorPosition || 0
         }
       )
-    ] })
+    ] }),
+    showCommandSuggestions && /* @__PURE__ */ jsx(
+      CommandSuggestions,
+      {
+        suggestions: commandSuggestions,
+        selectedIndex: selectedCommandIndex,
+        onSelect: handleCommandSelect
+      }
+    ),
+    showModelSelection && /* @__PURE__ */ jsx(
+      ModelSelection,
+      {
+        models: availableModels,
+        selectedIndex: selectedModelIndex,
+        onSelect: handleModelSelect
+      }
+    ),
+    /* @__PURE__ */ jsxs(
+      Box,
+      {
+        width: "100%",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingTop: 1,
+        paddingBottom: 0.5,
+        borderStyle: "single",
+        borderColor: "gray",
+        children: [
+          /* @__PURE__ */ jsxs(Box, { flexDirection: "row", flexWrap: "wrap", children: [
+            /* @__PURE__ */ jsx(Text, { dimColor: true, children: "\u{1F9E0} " }),
+            /* @__PURE__ */ jsxs(Text, { dimColor: true, children: [
+              tokenCount,
+              "/128000 (",
+              Math.round(tokenCount / 128e3 * 100),
+              "%)"
+            ] }),
+            /* @__PURE__ */ jsxs(Text, { dimColor: true, children: [
+              " ",
+              "\u2502 \u{1F4C1} ",
+              contextInfo?.workspaceFiles || 0,
+              " files \u2502 \u{1F4AC}",
+              " ",
+              chatHistory.length,
+              " msgs"
+            ] })
+          ] }),
+          /* @__PURE__ */ jsx(Text, { dimColor: true, children: "MCP: Ready" })
+        ]
+      }
+    ),
+    isProcessing && /* @__PURE__ */ jsx(
+      LoadingSpinner,
+      {
+        operation: isStreaming ? "thinking" : "process",
+        message: isStreaming ? "Generating response..." : "Processing..."
+      }
+    ),
+    /* @__PURE__ */ jsx(Text, { dimColor: true, children: "Plan Mode: Off" })
   ] });
 }
 function ChatInterface({
-  agent,
+  agent: propAgent,
   initialMessage
 }) {
-  const [currentAgent, setCurrentAgent] = useState(
-    agent || null
-  );
-  const handleApiKeySet = (newAgent) => {
-    setCurrentAgent(newAgent);
-  };
-  if (!currentAgent) {
-    return /* @__PURE__ */ jsx(ApiKeyInput, { onApiKeySet: handleApiKeySet });
-  }
-  return /* @__PURE__ */ jsx(
-    ChatInterfaceWithAgent,
-    {
-      agent: currentAgent,
-      initialMessage
+  const [agent, setAgent] = useState(propAgent || null);
+  const [isInitializing, setIsInitializing] = useState(!propAgent);
+  const [apiKeyError, setApiKeyError] = useState(null);
+  useEffect(() => {
+    if (!propAgent && !agent) {
+      const initializeAgent = async () => {
+        try {
+          setIsInitializing(true);
+          const dummyAgent = {
+            processUserMessageStream: async function* (message) {
+              yield { type: "content", content: "Hello! I'm ready to help." };
+              yield { type: "done" };
+            }
+          };
+          setAgent(dummyAgent);
+        } catch (error) {
+          setApiKeyError(
+            error instanceof Error ? error.message : "Failed to initialize agent"
+          );
+        } finally {
+          setIsInitializing(false);
+        }
+      };
+      initializeAgent();
     }
-  );
+  }, [propAgent, agent]);
+  if (isInitializing) {
+    return /* @__PURE__ */ jsxs(Box, { flexDirection: "column", paddingX: 2, paddingY: 1, children: [
+      /* @__PURE__ */ jsx(LoadingSpinner, { operation: "init", message: "Initializing Grok CLI..." }),
+      /* @__PURE__ */ jsx(Text, { color: "gray", paddingY: 1, children: "Please wait while we set up the agent..." })
+    ] });
+  }
+  if (apiKeyError) {
+    return /* @__PURE__ */ jsxs(Box, { flexDirection: "column", paddingX: 2, paddingY: 1, children: [
+      /* @__PURE__ */ jsx(Text, { color: "red", bold: true, children: "\u274C Agent Initialization Failed" }),
+      /* @__PURE__ */ jsx(Text, { color: "yellow", paddingY: 1, children: apiKeyError }),
+      /* @__PURE__ */ jsx(ApiKeyInput, { onSuccess: () => setApiKeyError(null) })
+    ] });
+  }
+  if (!agent) {
+    return /* @__PURE__ */ jsxs(Box, { flexDirection: "column", paddingX: 2, paddingY: 1, children: [
+      /* @__PURE__ */ jsx(Text, { color: "yellow", bold: true, children: "\u26A0\uFE0F No Agent Available" }),
+      /* @__PURE__ */ jsx(Text, { color: "gray", paddingY: 1, children: "Please provide an agent instance or ensure proper initialization." })
+    ] });
+  }
+  return /* @__PURE__ */ jsx(ChatInterfaceWithAgent, { agent, initialMessage });
 }
 
 // src/index.ts

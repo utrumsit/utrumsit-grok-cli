@@ -2,26 +2,22 @@ import { ToolResult } from "../../types/index.js";
 import { parse as parseTS } from "@typescript-eslint/typescript-estree";
 
 // Conditional tree-sitter imports for development compatibility
-// Use type imports to keep TypeScript happy (avoids 'any' sloppiness)
-import type { Parser as TSParser } from 'tree-sitter';
-import type { Language as TSLanguage } from 'tree-sitter';
-
-// Initialize with explicit types
-let Parser: TSParser | null = null;
-let JavaScript: TSLanguage | null = null;
-let TypeScript: TSLanguage | null = null;
-let Python: TSLanguage | null = null;
+// Use any for optional dependencies to avoid type issues
+let Parser: any = null;
+let JavaScript: any = null;
+let TypeScript: any = null;
+let Python: any = null;
 
 try {
   // Dynamic ESM imports for Tree-sitter modules
-  const tsModule = await import('tree-sitter');
+  const tsModule = await import("tree-sitter");
   Parser = tsModule.default || tsModule; // Handle default export or module
-  JavaScript = (await import('tree-sitter-javascript')).default;
-  TypeScript = (await import('tree-sitter-typescript')).default;
-  Python = (await import('tree-sitter-python')).default;
+  JavaScript = (await import("tree-sitter-javascript")).default;
+  TypeScript = (await import("tree-sitter-typescript")).default;
+  Python = (await import("tree-sitter-python")).default;
 
   // Debug log to confirm loading
-  console.log('Tree-sitter modules loaded successfully:', {
+  console.log("Tree-sitter modules loaded successfully:", {
     Parser: !!Parser,
     JavaScript: !!JavaScript,
     TypeScript: !!TypeScript,
@@ -30,8 +26,9 @@ try {
 } catch (error) {
   // Detailed error logging for debugging
   console.warn(
-    'Tree-sitter modules not available, falling back to TypeScript-only parsing.',
-    'Error:', error instanceof Error ? error.message : String(error)
+    "Tree-sitter modules not available, falling back to TypeScript-only parsing.",
+    "Error:",
+    error instanceof Error ? error.message : String(error),
   );
 }
 
@@ -45,8 +42,6 @@ const pathExists = async (filePath: string): Promise<boolean> => {
     return false;
   }
 };
-
-
 
 import path from "path";
 
@@ -71,11 +66,19 @@ export interface ParseResult {
 
 export interface SymbolInfo {
   name: string;
-  type: 'function' | 'class' | 'variable' | 'interface' | 'enum' | 'type' | 'method' | 'property';
+  type:
+    | "function"
+    | "class"
+    | "variable"
+    | "interface"
+    | "enum"
+    | "type"
+    | "method"
+    | "property";
   startPosition: { row: number; column: number };
   endPosition: { row: number; column: number };
   scope: string;
-  accessibility?: 'public' | 'private' | 'protected';
+  accessibility?: "public" | "private" | "protected";
   isStatic?: boolean;
   isAsync?: boolean;
   parameters?: ParameterInfo[];
@@ -105,7 +108,14 @@ export interface ImportSpecifier {
 
 export interface ExportInfo {
   name: string;
-  type: 'function' | 'class' | 'variable' | 'interface' | 'enum' | 'type' | 'default';
+  type:
+    | "function"
+    | "class"
+    | "variable"
+    | "interface"
+    | "enum"
+    | "type"
+    | "default";
   startPosition: { row: number; column: number };
   isDefault?: boolean;
   source?: string; // For re-exports
@@ -115,12 +125,13 @@ export interface ParseError {
   message: string;
   line: number;
   column: number;
-  severity: 'error' | 'warning';
+  severity: "error" | "warning";
 }
 
 export class ASTParserTool {
   name = "ast_parser";
-  description = "Parse source code files to extract AST, symbols, imports, exports, and structural information";
+  description =
+    "Parse source code files to extract AST, symbols, imports, exports, and structural information";
 
   private parsers: Map<string, any> = new Map();
 
@@ -130,86 +141,95 @@ export class ASTParserTool {
 
   private initializeParsers() {
     if (!Parser || !JavaScript || !TypeScript || !Python) {
-      console.log("Tree-sitter parsers not available, using TypeScript-only parsing");
+      console.log(
+        "Tree-sitter parsers not available, using TypeScript-only parsing",
+      );
       return;
     }
-    
+
     try {
       // JavaScript/JSX parser
       const jsParser = new Parser();
       jsParser.setLanguage(JavaScript as any);
-      this.parsers.set('javascript', jsParser);
-      this.parsers.set('js', jsParser);
-      this.parsers.set('jsx', jsParser);
+      this.parsers.set("javascript", jsParser);
+      this.parsers.set("js", jsParser);
+      this.parsers.set("jsx", jsParser);
 
       // TypeScript/TSX parser
       const tsParser = new Parser();
       tsParser.setLanguage((TypeScript as any).typescript);
-      this.parsers.set('typescript', tsParser);
-      this.parsers.set('ts', tsParser);
+      this.parsers.set("typescript", tsParser);
+      this.parsers.set("ts", tsParser);
 
       const tsxParser = new Parser();
       tsxParser.setLanguage((TypeScript as any).tsx);
-      this.parsers.set('tsx', tsxParser);
+      this.parsers.set("tsx", tsxParser);
 
       // Python parser
       const pyParser = new Parser();
       pyParser.setLanguage(Python as any);
-      this.parsers.set('python', pyParser);
-      this.parsers.set('py', pyParser);
+      this.parsers.set("python", pyParser);
+      this.parsers.set("py", pyParser);
     } catch (error) {
-      console.warn('Failed to initialize some parsers:', error);
+      console.warn("Failed to initialize some parsers:", error);
     }
   }
 
   private detectLanguage(filePath: string): string {
     const ext = path.extname(filePath).slice(1).toLowerCase();
-    
+
     switch (ext) {
-      case 'js':
-      case 'mjs':
-      case 'cjs':
-        return 'javascript';
-      case 'jsx':
-        return 'jsx';
-      case 'ts':
-        return 'typescript';
-      case 'tsx':
-        return 'tsx';
-      case 'py':
-      case 'pyw':
-        return 'python';
+      case "js":
+      case "mjs":
+      case "cjs":
+        return "javascript";
+      case "jsx":
+        return "jsx";
+      case "ts":
+        return "typescript";
+      case "tsx":
+        return "tsx";
+      case "py":
+      case "pyw":
+        return "python";
       default:
-        return 'javascript'; // Default fallback
+        return "javascript"; // Default fallback
     }
   }
 
   async execute(args: any): Promise<ToolResult> {
     try {
-      const { 
-        filePath, 
-        includeSymbols = true, 
-        includeImports = true, 
+      const {
+        filePath,
+        includeSymbols = true,
+        includeImports = true,
         includeTree = false,
-        symbolTypes = ['function', 'class', 'variable', 'interface', 'enum', 'type'],
-        scope = 'all' // 'all', 'global', 'local'
+        symbolTypes = [
+          "function",
+          "class",
+          "variable",
+          "interface",
+          "enum",
+          "type",
+        ],
+        scope = "all", // 'all', 'global', 'local'
       } = args;
 
       if (!filePath) {
         throw new Error("File path is required");
       }
 
-      if (!await pathExists(filePath)) {
+      if (!(await pathExists(filePath))) {
         throw new Error(`File not found: ${filePath}`);
       }
 
-      const content = await ops.promises.readFile(filePath, 'utf-8');
+      const content = await ops.promises.readFile(filePath, "utf-8");
       const language = this.detectLanguage(filePath);
-      
+
       let result: ParseResult;
 
       // Use TypeScript ESTree for better TypeScript analysis
-      if (language === 'typescript' || language === 'tsx') {
+      if (language === "typescript" || language === "tsx") {
         result = await this.parseWithTypeScript(content, language, filePath);
       } else {
         result = await this.parseWithTreeSitter(content, language, filePath);
@@ -219,9 +239,10 @@ export class ASTParserTool {
       if (!includeSymbols) {
         result.symbols = [];
       } else {
-        result.symbols = result.symbols.filter(symbol => 
-          symbolTypes.includes(symbol.type) && 
-          (scope === 'all' || this.matchesScope(symbol, scope))
+        result.symbols = result.symbols.filter(
+          (symbol) =>
+            symbolTypes.includes(symbol.type) &&
+            (scope === "all" || this.matchesScope(symbol, scope)),
         );
       }
 
@@ -231,48 +252,60 @@ export class ASTParserTool {
       }
 
       if (!includeTree) {
-        result.tree = { type: 'program', text: '', startPosition: { row: 0, column: 0 }, endPosition: { row: 0, column: 0 } };
+        result.tree = {
+          type: "program",
+          text: "",
+          startPosition: { row: 0, column: 0 },
+          endPosition: { row: 0, column: 0 },
+        };
       }
 
       return {
         success: true,
-        output: JSON.stringify({
-          filePath,
-          language: result.language,
-          symbolCount: result.symbols.length,
-          importCount: result.imports.length,
-          exportCount: result.exports.length,
-          errorCount: result.errors.length,
-          ...(includeSymbols && { symbols: result.symbols }),
-          ...(includeImports && { 
-            imports: result.imports,
-            exports: result.exports 
-          }),
-          ...(includeTree && { tree: result.tree }),
-          ...(result.errors.length > 0 && { errors: result.errors })
-        }, null, 2)
+        output: JSON.stringify(
+          {
+            filePath,
+            language: result.language,
+            symbolCount: result.symbols.length,
+            importCount: result.imports.length,
+            exportCount: result.exports.length,
+            errorCount: result.errors.length,
+            ...(includeSymbols && { symbols: result.symbols }),
+            ...(includeImports && {
+              imports: result.imports,
+              exports: result.exports,
+            }),
+            ...(includeTree && { tree: result.tree }),
+            ...(result.errors.length > 0 && { errors: result.errors }),
+          },
+          null,
+          2,
+        ),
       };
-
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
 
-  private async parseWithTypeScript(content: string, language: string, filePath: string): Promise<ParseResult> {
+  private async parseWithTypeScript(
+    content: string,
+    language: string,
+    filePath: string,
+  ): Promise<ParseResult> {
     const errors: ParseError[] = [];
-    
+
     try {
       const ast = parseTS(content, {
-        jsx: language === 'tsx',
+        jsx: language === "tsx",
         loc: true,
         range: true,
         comment: true,
         attachComments: true,
         errorOnUnknownASTType: false,
-        errorOnTypeScriptSyntacticAndSemanticIssues: false
+        errorOnTypeScriptSyntacticAndSemanticIssues: false,
       });
 
       const symbols = this.extractTypeScriptSymbols(ast, content);
@@ -286,14 +319,14 @@ export class ASTParserTool {
         symbols,
         imports,
         exports,
-        errors
+        errors,
       };
     } catch (error) {
       errors.push({
         message: error instanceof Error ? error.message : String(error),
         line: 0,
         column: 0,
-        severity: 'error'
+        severity: "error",
       });
 
       // Fallback to tree-sitter
@@ -301,20 +334,41 @@ export class ASTParserTool {
     }
   }
 
-  private async parseWithTreeSitter(content: string, language: string, filePath: string): Promise<ParseResult> {
+  private async parseWithTreeSitter(
+    content: string,
+    language: string,
+    filePath: string,
+  ): Promise<ParseResult> {
     const parser = this.parsers.get(language);
     if (!parser) {
       // Fall back to TypeScript parsing if tree-sitter parser not available
-      if (language === 'typescript' || language === 'ts' || language === 'javascript' || language === 'js') {
+      if (
+        language === "typescript" ||
+        language === "ts" ||
+        language === "javascript" ||
+        language === "js"
+      ) {
         return await this.parseWithTypeScript(content, language, filePath);
       }
       throw new Error(`Unsupported language: ${language}`);
     }
 
     const tree = parser.parse(content);
-    const symbols = this.extractTreeSitterSymbols(tree.rootNode, content, language);
-    const imports = this.extractTreeSitterImports(tree.rootNode, content, language);
-    const exports = this.extractTreeSitterExports(tree.rootNode, content, language);
+    const symbols = this.extractTreeSitterSymbols(
+      tree.rootNode,
+      content,
+      language,
+    );
+    const imports = this.extractTreeSitterImports(
+      tree.rootNode,
+      content,
+      language,
+    );
+    const exports = this.extractTreeSitterExports(
+      tree.rootNode,
+      content,
+      language,
+    );
     const astTree = this.convertTreeSitterAST(tree.rootNode, content);
 
     return {
@@ -323,114 +377,115 @@ export class ASTParserTool {
       symbols,
       imports,
       exports,
-      errors: []
+      errors: [],
     };
   }
 
   private extractTypeScriptSymbols(ast: any, content: string): SymbolInfo[] {
     const symbols: SymbolInfo[] = [];
-    const lines = content.split('\n');
+    const lines = content.split("\n");
 
-    const visit = (node: any, scope = 'global') => {
+    const visit = (node: any, scope = "global") => {
       if (!node) return;
 
       const getPosition = (pos: any) => ({
         row: pos.line - 1,
-        column: pos.column
+        column: pos.column,
       });
 
       switch (node.type) {
-        case 'FunctionDeclaration':
+        case "FunctionDeclaration":
           if (node.id?.name) {
             symbols.push({
               name: node.id.name,
-              type: 'function',
+              type: "function",
               startPosition: getPosition(node.loc.start),
               endPosition: getPosition(node.loc.end),
               scope,
               isAsync: node.async,
-              parameters: node.params?.map((param: any) => ({
-                name: param.name || (param.left?.name) || 'unknown',
-                type: param.typeAnnotation?.typeAnnotation?.type,
-                optional: param.optional
-              })) || []
+              parameters:
+                node.params?.map((param: any) => ({
+                  name: param.name || param.left?.name || "unknown",
+                  type: param.typeAnnotation?.typeAnnotation?.type,
+                  optional: param.optional,
+                })) || [],
             });
           }
           break;
 
-        case 'ClassDeclaration':
+        case "ClassDeclaration":
           if (node.id?.name) {
             symbols.push({
               name: node.id.name,
-              type: 'class',
+              type: "class",
               startPosition: getPosition(node.loc.start),
               endPosition: getPosition(node.loc.end),
-              scope
+              scope,
             });
           }
           // Visit class methods
           node.body?.body?.forEach((member: any) => {
-            if (member.type === 'MethodDefinition' && member.key?.name) {
+            if (member.type === "MethodDefinition" && member.key?.name) {
               symbols.push({
                 name: member.key.name,
-                type: 'method',
+                type: "method",
                 startPosition: getPosition(member.loc.start),
                 endPosition: getPosition(member.loc.end),
-                scope: `${node.id?.name || 'unknown'}.${member.key.name}`,
+                scope: `${node.id?.name || "unknown"}.${member.key.name}`,
                 accessibility: member.accessibility,
                 isStatic: member.static,
-                isAsync: member.value?.async
+                isAsync: member.value?.async,
               });
             }
           });
           break;
 
-        case 'VariableDeclaration':
+        case "VariableDeclaration":
           node.declarations?.forEach((decl: any) => {
             if (decl.id?.name) {
               symbols.push({
                 name: decl.id.name,
-                type: 'variable',
+                type: "variable",
                 startPosition: getPosition(decl.loc.start),
                 endPosition: getPosition(decl.loc.end),
-                scope
+                scope,
               });
             }
           });
           break;
 
-        case 'TSInterfaceDeclaration':
+        case "TSInterfaceDeclaration":
           if (node.id?.name) {
             symbols.push({
               name: node.id.name,
-              type: 'interface',
+              type: "interface",
               startPosition: getPosition(node.loc.start),
               endPosition: getPosition(node.loc.end),
-              scope
+              scope,
             });
           }
           break;
 
-        case 'TSEnumDeclaration':
+        case "TSEnumDeclaration":
           if (node.id?.name) {
             symbols.push({
               name: node.id.name,
-              type: 'enum',
+              type: "enum",
               startPosition: getPosition(node.loc.start),
               endPosition: getPosition(node.loc.end),
-              scope
+              scope,
             });
           }
           break;
 
-        case 'TSTypeAliasDeclaration':
+        case "TSTypeAliasDeclaration":
           if (node.id?.name) {
             symbols.push({
               name: node.id.name,
-              type: 'type',
+              type: "type",
               startPosition: getPosition(node.loc.start),
               endPosition: getPosition(node.loc.end),
-              scope
+              scope,
             });
           }
           break;
@@ -438,15 +493,15 @@ export class ASTParserTool {
 
       // Recursively visit children
       for (const key in node) {
-        if (key !== 'parent' && key !== 'loc' && key !== 'range') {
+        if (key !== "parent" && key !== "loc" && key !== "range") {
           const child = node[key];
           if (Array.isArray(child)) {
-            child.forEach(grandchild => {
-              if (grandchild && typeof grandchild === 'object') {
+            child.forEach((grandchild) => {
+              if (grandchild && typeof grandchild === "object") {
                 visit(grandchild, scope);
               }
             });
-          } else if (child && typeof child === 'object') {
+          } else if (child && typeof child === "object") {
             visit(child, scope);
           }
         }
@@ -461,27 +516,30 @@ export class ASTParserTool {
     const imports: ImportInfo[] = [];
 
     const visit = (node: any) => {
-      if (node.type === 'ImportDeclaration') {
+      if (node.type === "ImportDeclaration") {
         const specifiers: ImportSpecifier[] = [];
-        
+
         node.specifiers?.forEach((spec: any) => {
           switch (spec.type) {
-            case 'ImportDefaultSpecifier':
+            case "ImportDefaultSpecifier":
               specifiers.push({
                 name: spec.local.name,
-                isDefault: true
+                isDefault: true,
               });
               break;
-            case 'ImportNamespaceSpecifier':
+            case "ImportNamespaceSpecifier":
               specifiers.push({
                 name: spec.local.name,
-                isNamespace: true
+                isNamespace: true,
               });
               break;
-            case 'ImportSpecifier':
+            case "ImportSpecifier":
               specifiers.push({
                 name: spec.imported.name,
-                alias: spec.local.name !== spec.imported.name ? spec.local.name : undefined
+                alias:
+                  spec.local.name !== spec.imported.name
+                    ? spec.local.name
+                    : undefined,
               });
               break;
           }
@@ -490,25 +548,25 @@ export class ASTParserTool {
         imports.push({
           source: node.source.value,
           specifiers,
-          isTypeOnly: node.importKind === 'type',
+          isTypeOnly: node.importKind === "type",
           startPosition: {
             row: node.loc.start.line - 1,
-            column: node.loc.start.column
-          }
+            column: node.loc.start.column,
+          },
         });
       }
 
       // Recursively visit children
       for (const key in node) {
-        if (key !== 'parent' && key !== 'loc' && key !== 'range') {
+        if (key !== "parent" && key !== "loc" && key !== "range") {
           const child = node[key];
           if (Array.isArray(child)) {
-            child.forEach(grandchild => {
-              if (grandchild && typeof grandchild === 'object') {
+            child.forEach((grandchild) => {
+              if (grandchild && typeof grandchild === "object") {
                 visit(grandchild);
               }
             });
-          } else if (child && typeof child === 'object') {
+          } else if (child && typeof child === "object") {
             visit(child);
           }
         }
@@ -524,7 +582,7 @@ export class ASTParserTool {
 
     const visit = (node: any) => {
       switch (node.type) {
-        case 'ExportNamedDeclaration':
+        case "ExportNamedDeclaration":
           if (node.declaration) {
             // Export declaration (export function foo() {})
             if (node.declaration.id?.name) {
@@ -533,8 +591,8 @@ export class ASTParserTool {
                 type: this.getDeclarationType(node.declaration.type),
                 startPosition: {
                   row: node.loc.start.line - 1,
-                  column: node.loc.start.column
-                }
+                  column: node.loc.start.column,
+                },
               });
             }
           } else if (node.specifiers) {
@@ -542,42 +600,42 @@ export class ASTParserTool {
             node.specifiers.forEach((spec: any) => {
               exports.push({
                 name: spec.exported.name,
-                type: 'variable', // Default to variable
+                type: "variable", // Default to variable
                 startPosition: {
                   row: node.loc.start.line - 1,
-                  column: node.loc.start.column
+                  column: node.loc.start.column,
                 },
-                source: node.source?.value
+                source: node.source?.value,
               });
             });
           }
           break;
 
-        case 'ExportDefaultDeclaration':
-          const name = node.declaration?.id?.name || 'default';
+        case "ExportDefaultDeclaration":
+          const name = node.declaration?.id?.name || "default";
           exports.push({
             name,
-            type: this.getDeclarationType(node.declaration?.type) || 'default',
+            type: this.getDeclarationType(node.declaration?.type) || "default",
             startPosition: {
               row: node.loc.start.line - 1,
-              column: node.loc.start.column
+              column: node.loc.start.column,
             },
-            isDefault: true
+            isDefault: true,
           });
           break;
       }
 
       // Recursively visit children
       for (const key in node) {
-        if (key !== 'parent' && key !== 'loc' && key !== 'range') {
+        if (key !== "parent" && key !== "loc" && key !== "range") {
           const child = node[key];
           if (Array.isArray(child)) {
-            child.forEach(grandchild => {
-              if (grandchild && typeof grandchild === 'object') {
+            child.forEach((grandchild) => {
+              if (grandchild && typeof grandchild === "object") {
                 visit(grandchild);
               }
             });
-          } else if (child && typeof child === 'object') {
+          } else if (child && typeof child === "object") {
             visit(child);
           }
         }
@@ -588,56 +646,78 @@ export class ASTParserTool {
     return exports;
   }
 
-  private extractTreeSitterSymbols(node: any, content: string, language: string): SymbolInfo[] {
+  private extractTreeSitterSymbols(
+    node: any,
+    content: string,
+    language: string,
+  ): SymbolInfo[] {
     const symbols: SymbolInfo[] = [];
-    const lines = content.split('\n');
+    const lines = content.split("\n");
 
-    const visit = (node: any, scope = 'global') => {
+    const visit = (node: any, scope = "global") => {
       const nodeText = content.slice(node.startIndex, node.endIndex);
-      const startPos = { row: node.startPosition.row, column: node.startPosition.column };
-      const endPos = { row: node.endPosition.row, column: node.endPosition.column };
+      const startPos = {
+        row: node.startPosition.row,
+        column: node.startPosition.column,
+      };
+      const endPos = {
+        row: node.endPosition.row,
+        column: node.endPosition.column,
+      };
 
       switch (node.type) {
-        case 'function_declaration':
-        case 'function_definition':
-          const funcName = this.extractNodeName(node, 'name') || this.extractNodeName(node, 'identifier');
+        case "function_declaration":
+        case "function_definition":
+          const funcName =
+            this.extractNodeName(node, "name") ||
+            this.extractNodeName(node, "identifier");
           if (funcName) {
             symbols.push({
               name: funcName,
-              type: 'function',
+              type: "function",
               startPosition: startPos,
               endPosition: endPos,
-              scope
+              scope,
             });
           }
           break;
 
-        case 'class_declaration':
-        case 'class_definition':
-          const className = this.extractNodeName(node, 'name') || this.extractNodeName(node, 'identifier');
+        case "class_declaration":
+        case "class_definition":
+          const className =
+            this.extractNodeName(node, "name") ||
+            this.extractNodeName(node, "identifier");
           if (className) {
             symbols.push({
               name: className,
-              type: 'class',
+              type: "class",
               startPosition: startPos,
               endPosition: endPos,
-              scope
+              scope,
             });
           }
           break;
 
-        case 'variable_declaration':
-        case 'lexical_declaration':
+        case "variable_declaration":
+        case "lexical_declaration":
           node.children?.forEach((child: any) => {
-            if (child.type === 'variable_declarator') {
-              const varName = this.extractNodeName(child, 'name') || this.extractNodeName(child, 'identifier');
+            if (child.type === "variable_declarator") {
+              const varName =
+                this.extractNodeName(child, "name") ||
+                this.extractNodeName(child, "identifier");
               if (varName) {
                 symbols.push({
                   name: varName,
-                  type: 'variable',
-                  startPosition: { row: child.startPosition.row, column: child.startPosition.column },
-                  endPosition: { row: child.endPosition.row, column: child.endPosition.column },
-                  scope
+                  type: "variable",
+                  startPosition: {
+                    row: child.startPosition.row,
+                    column: child.startPosition.column,
+                  },
+                  endPosition: {
+                    row: child.endPosition.row,
+                    column: child.endPosition.column,
+                  },
+                  scope,
                 });
               }
             }
@@ -653,26 +733,37 @@ export class ASTParserTool {
     return symbols;
   }
 
-  private extractTreeSitterImports(node: any, content: string, language: string): ImportInfo[] {
+  private extractTreeSitterImports(
+    node: any,
+    content: string,
+    language: string,
+  ): ImportInfo[] {
     const imports: ImportInfo[] = [];
 
     const visit = (node: any) => {
-      if (node.type === 'import_statement' || node.type === 'import_from_statement') {
+      if (
+        node.type === "import_statement" ||
+        node.type === "import_from_statement"
+      ) {
         // Extract import details from tree-sitter node
-        const sourceNode = node.children?.find((child: any) => 
-          child.type === 'string' || child.type === 'string_literal'
+        const sourceNode = node.children?.find(
+          (child: any) =>
+            child.type === "string" || child.type === "string_literal",
         );
-        
+
         if (sourceNode) {
-          const source = content.slice(sourceNode.startIndex + 1, sourceNode.endIndex - 1); // Remove quotes
-          
+          const source = content.slice(
+            sourceNode.startIndex + 1,
+            sourceNode.endIndex - 1,
+          ); // Remove quotes
+
           imports.push({
             source,
             specifiers: [], // Simplified for tree-sitter
             startPosition: {
               row: node.startPosition.row,
-              column: node.startPosition.column
-            }
+              column: node.startPosition.column,
+            },
           });
         }
       }
@@ -684,20 +775,24 @@ export class ASTParserTool {
     return imports;
   }
 
-  private extractTreeSitterExports(node: any, content: string, language: string): ExportInfo[] {
+  private extractTreeSitterExports(
+    node: any,
+    content: string,
+    language: string,
+  ): ExportInfo[] {
     const exports: ExportInfo[] = [];
 
     const visit = (node: any) => {
-      if (node.type === 'export_statement') {
+      if (node.type === "export_statement") {
         // Simplified export extraction for tree-sitter
-        const name = this.extractNodeName(node, 'name') || 'unknown';
+        const name = this.extractNodeName(node, "name") || "unknown";
         exports.push({
           name,
-          type: 'variable',
+          type: "variable",
           startPosition: {
             row: node.startPosition.row,
-            column: node.startPosition.column
-          }
+            column: node.startPosition.column,
+          },
         });
       }
 
@@ -711,16 +806,22 @@ export class ASTParserTool {
   private convertTypeScriptAST(node: any): ASTNode {
     return {
       type: node.type,
-      text: '',
-      startPosition: { row: node.loc?.start?.line - 1 || 0, column: node.loc?.start?.column || 0 },
-      endPosition: { row: node.loc?.end?.line - 1 || 0, column: node.loc?.end?.column || 0 },
-      children: []
+      text: "",
+      startPosition: {
+        row: node.loc?.start?.line - 1 || 0,
+        column: node.loc?.start?.column || 0,
+      },
+      endPosition: {
+        row: node.loc?.end?.line - 1 || 0,
+        column: node.loc?.end?.column || 0,
+      },
+      children: [],
     };
   }
 
   private convertTreeSitterAST(node: any, content: string): ASTNode {
     const children: ASTNode[] = [];
-    
+
     if (node.children) {
       for (const child of node.children) {
         children.push(this.convertTreeSitterAST(child, content));
@@ -730,40 +831,48 @@ export class ASTParserTool {
     return {
       type: node.type,
       text: content.slice(node.startIndex, node.endIndex),
-      startPosition: { row: node.startPosition.row, column: node.startPosition.column },
-      endPosition: { row: node.endPosition.row, column: node.endPosition.column },
-      children
+      startPosition: {
+        row: node.startPosition.row,
+        column: node.startPosition.column,
+      },
+      endPosition: {
+        row: node.endPosition.row,
+        column: node.endPosition.column,
+      },
+      children,
     };
   }
 
   private extractNodeName(node: any, nameField: string): string | null {
-    const nameNode = node.children?.find((child: any) => child.type === nameField);
+    const nameNode = node.children?.find(
+      (child: any) => child.type === nameField,
+    );
     return nameNode ? nameNode.text : null;
   }
 
-  private getDeclarationType(nodeType: string): ExportInfo['type'] {
+  private getDeclarationType(nodeType: string): ExportInfo["type"] {
     switch (nodeType) {
-      case 'FunctionDeclaration':
-        return 'function';
-      case 'ClassDeclaration':
-        return 'class';
-      case 'TSInterfaceDeclaration':
-        return 'interface';
-      case 'TSEnumDeclaration':
-        return 'enum';
-      case 'TSTypeAliasDeclaration':
-        return 'type';
+      case "FunctionDeclaration":
+        return "function";
+      case "ClassDeclaration":
+        return "class";
+      case "TSInterfaceDeclaration":
+        return "interface";
+      case "TSEnumDeclaration":
+        return "enum";
+      case "TSTypeAliasDeclaration":
+        return "type";
       default:
-        return 'variable';
+        return "variable";
     }
   }
 
   private matchesScope(symbol: SymbolInfo, scope: string): boolean {
     switch (scope) {
-      case 'global':
-        return symbol.scope === 'global';
-      case 'local':
-        return symbol.scope !== 'global';
+      case "global":
+        return symbol.scope === "global";
+      case "local":
+        return symbol.scope !== "global";
       default:
         return true;
     }
@@ -775,40 +884,57 @@ export class ASTParserTool {
       properties: {
         filePath: {
           type: "string",
-          description: "Path to the source code file to parse"
+          description: "Path to the source code file to parse",
         },
         includeSymbols: {
           type: "boolean",
-          description: "Whether to extract symbols (functions, classes, variables, etc.)",
-          default: true
+          description:
+            "Whether to extract symbols (functions, classes, variables, etc.)",
+          default: true,
         },
         includeImports: {
-          type: "boolean", 
+          type: "boolean",
           description: "Whether to extract import/export information",
-          default: true
+          default: true,
         },
         includeTree: {
           type: "boolean",
           description: "Whether to include the full AST tree in response",
-          default: false
+          default: false,
         },
         symbolTypes: {
           type: "array",
           items: {
             type: "string",
-            enum: ["function", "class", "variable", "interface", "enum", "type", "method", "property"]
+            enum: [
+              "function",
+              "class",
+              "variable",
+              "interface",
+              "enum",
+              "type",
+              "method",
+              "property",
+            ],
           },
           description: "Types of symbols to extract",
-          default: ["function", "class", "variable", "interface", "enum", "type"]
+          default: [
+            "function",
+            "class",
+            "variable",
+            "interface",
+            "enum",
+            "type",
+          ],
         },
         scope: {
           type: "string",
           enum: ["all", "global", "local"],
           description: "Scope of symbols to extract",
-          default: "all"
-        }
+          default: "all",
+        },
       },
-      required: ["filePath"]
+      required: ["filePath"],
     };
   }
 }

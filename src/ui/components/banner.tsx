@@ -1,64 +1,66 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Box, Text } from "ink";
-import pkg from '../../../package.json' with { type: 'json' };
+import pkg from "../../../package.json" with { type: "json" };
 import { inkColors } from "../colors.js";
 import { ContextStatus } from "./context-status.js";
 
 // Enhanced GROK CLI ASCII art with color scheme
-export const grokBanner = `
- ██████  ██████   ██████  ██   ██     ██████ ██      ██ 
-██       ██   ██ ██    ██ ██  ██     ██      ██      ██ 
-██   ███ ██████  ██    ██ █████      ██      ██      ██ 
-██    ██ ██   ██ ██    ██ ██  ██     ██      ██      ██ 
- ██████  ██   ██  ██████  ██   ██     ██████ ███████ ██ 
-`;
+export const grokBanner =
+  "  ██████  ██████   ██████  ██   ██     ██████ ██      ██ \n" +
+  "██       ██   ██ ██    ██ ██  ██     ██      ██      ██ \n" +
+  "██   ███ ██████  ██    ██ █████      ██      ██      ██ \n" +
+  "██    ██ ██   ██ ██    ██ ██  ██     ██      ██      ██ \n" +
+  " ██████  ██   ██  ██████  ██   ██     ██████ ███████ ██ \n";
 
 // Alternative minimal banner for --quiet mode
-export const grokMini = `
- ▄▄▄▄▄▄▄ ▄▄▄▄▄▄   ▄▄▄▄▄▄  ▄   ▄
-██       ██   ██ ██    ██ ██ ██ 
-██   ███ ██▄▄▄██ ██    ██ ████  
-██    ██ ██   ██ ██    ██ ██ ██ 
- ▀▀▀▀▀▀▀ ▀▀   ▀▀  ▀▀▀▀▀▀  ▀▀  ▀▀
-`;
+export const grokMini =
+  "  ▄▄▄▄▄▄▄ ▄▄▄▄▄▄   ▄▄▄▄▄▄  ▄   ▄\n" +
+  "██       ██   ██ ██    ██ ██ ██ \n" +
+  "██   ███ ██▄▄▄██ ██    ██ ████  \n" +
+  "██    ██ ██   ██ ██    ██ ██ ██ \n" +
+  " ▀▀▀▀▀▀▀ ▀▀   ▀▀  ▀▀▀▀▀▀  ▀▀  ▀▀\n";
 
 // Retro style banner
-export const grokRetro = `
-╔═══════════════════════════════════════════════════════╗
-║  ▄▄▄▄   ▄▄▄▄▄   ▄▄▄▄▄   ▄   ▄   ▄▄▄▄▄   ▄     ▄      ║
-║ ██      ██   █ ██    █ ██ ██  ██      ██    ██       ║
-║ ██  ▄▄▄ ██▄▄▄█ ██    █ ████   ██      ██    ██       ║
-║ ██   ██ ██  ██ ██    █ ██ ██  ██      ██    ██       ║
-║  ▀▀▀▀▀   ▀▀  ▀▀  ▀▀▀▀▀▀  ▀▀  ▀▀  ▀▀▀▀▀   ▀▀▀▀▀ ▀▀      ║
-╚═══════════════════════════════════════════════════════╝
-`;
+export const grokRetro =
+  "╔═══════════════════════════════════════════════════════╗\n" +
+  "║  ▄▄▄▄   ▄▄▄▄▄   ▄▄▄▄▄   ▄   ▄   ▄▄▄▄▄   ▄     ▄      ║\n" +
+  "║ ██      ██   █ ██    █ ██ ██  ██      ██    ██       ║\n" +
+  "║ ██  ▄▄▄ ██▄▄▄█ ██    █ ████   ██      ██    ██       ║\n" +
+  "║ ██   ██ ██  ██ ██    █ ██ ██  ██      ██    ██       ║\n" +
+  "║  ▀▀▀▀▀   ▀▀  ▀▀  ▀▀▀▀▀▀  ▀▀  ▀▀  ▀▀▀▀▀   ▀▀▀▀▀ ▀▀      ║\n" +
+  "╚═══════════════════════════════════════════════════════╝\n";
 
 interface BannerProps {
-  style?: 'default' | 'mini' | 'retro';
+  style?: "default" | "mini" | "retro";
   showContext?: boolean;
   workspaceFiles?: number;
   indexSize?: string;
   sessionRestored?: boolean;
+  isLoading?: boolean;
 }
 
-export function Banner({ 
-  style = 'default', 
+function BannerComponent({
+  style = "default",
   showContext = true,
   workspaceFiles = 0,
-  indexSize = '0 MB',
-  sessionRestored = false 
+  indexSize = "0 MB",
+  sessionRestored = false,
+  isLoading = false,
 }: BannerProps) {
-  const getBannerArt = () => {
+  const bannerArt = useMemo(() => {
     switch (style) {
-      case 'mini': return grokMini;
-      case 'retro': return grokRetro;
-      default: return grokBanner;
+      case "mini":
+        return grokMini;
+      case "retro":
+        return grokRetro;
+      default:
+        return grokBanner;
     }
-  };
+  }, [style]);
 
   const getContextStatus = () => {
     if (!showContext) return null;
-    
+
     return (
       <Box marginTop={1}>
         <Text color={inkColors.muted}>Context: </Text>
@@ -69,87 +71,105 @@ export function Banner({
           showDetails={false}
         />
         <Text color={inkColors.muted}> · Press </Text>
-        <Text color={inkColors.accent} bold>Ctrl+I</Text>
+        <Text color={inkColors.accent} bold>
+          Ctrl+I
+        </Text>
         <Text color={inkColors.muted}> for details</Text>
       </Box>
     );
   };
 
+  if (isLoading) {
+    return (
+      <Box flexDirection="column" marginBottom={2}>
+        <Text color={inkColors.primary} bold>
+          Initializing Grok CLI...
+        </Text>
+      </Box>
+    );
+  }
+
   return (
     <Box flexDirection="column" marginBottom={2}>
       {/* ASCII Art Banner */}
-      <Text color={inkColors.accentBright}>
-        {getBannerArt()}
-      </Text>
-      
+      <Text color={inkColors.accentBright}>{bannerArt}</Text>
+
       {/* Welcome Message */}
       <Box marginTop={1}>
         <Text color={inkColors.muted}>Welcome to </Text>
-        <Text color={inkColors.primary} bold>Grok CLI</Text>
+        <Text color={inkColors.primary} bold>
+          Grok CLI
+        </Text>
         <Text color={inkColors.muted}> </Text>
         <Text color={inkColors.warning}>v{pkg.version}</Text>
         <Text color={inkColors.muted}> ⚡</Text>
       </Box>
-      
+
       {/* Claude Code-level Intelligence tagline */}
       <Box marginTop={1}>
         <Text color={inkColors.success} bold>
           🚀 Claude Code-level intelligence in your terminal!
         </Text>
       </Box>
-      
+
       {/* Context Status Banner */}
       {getContextStatus()}
-      
+
       {/* Ready indicator with pulsing effect simulation */}
       <Box marginTop={1}>
         <Text color={inkColors.successBright}>✔ Ready.</Text>
-        <Text color={inkColors.muted}> Type your first command or paste code to begin.</Text>
+        <Text color={inkColors.muted}>
+          {" "}
+          Type your first command or paste code to begin.
+        </Text>
       </Box>
     </Box>
   );
 }
 
+export const Banner = React.memo(BannerComponent);
+
 // Helper function for showing different banner styles
 export function showBanner(options?: {
-  style?: 'default' | 'mini' | 'retro';
+  style?: "default" | "mini" | "retro";
   quiet?: boolean;
   workspaceFiles?: number;
   indexSize?: string;
   sessionRestored?: boolean;
 }) {
-  const { style = 'default', quiet = false, ...contextProps } = options || {};
-  
+  const { style = "default", quiet = false, ...contextProps } = options || {};
+
   if (quiet) {
     return (
       <Box>
-        <Text color={inkColors.primary} bold>Grok CLI</Text>
+        <Text color={inkColors.primary} bold>
+          Grok CLI
+        </Text>
         <Text color={inkColors.muted}> v{pkg.version} ready ⚡</Text>
       </Box>
     );
   }
-  
+
   return <Banner style={style} showContext={true} {...contextProps} />;
 }
 
 // Secret easter egg banner for grok --ascii
-export const easterEggBanner = `
-${`
-  ██████╗ ██████╗  ██████╗ ██╗  ██╗     ██████╗██╗     ██╗
- ██╔════╝ ██╔══██╗██╔═══██╗██║ ██╔╝    ██╔════╝██║     ██║
- ██║  ███╗██████╔╝██║   ██║█████╔╝     ██║     ██║     ██║
- ██║   ██║██╔══██╗██║   ██║██╔═██╗     ██║     ██║     ██║
- ╚██████╔╝██║  ██║╚██████╔╝██║  ██╗    ╚██████╗███████╗██║
-  ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝     ╚═════╝╚══════╝╚═╝
-`}
-    🌟 "Code at the speed of thought" 🌟
-`;
+export const easterEggBanner =
+  "   ██████╗ ██████╗  ██████╗ ██╗  ██╗     ██████╗██╗     ██╗\n" +
+  "  ██╔════╝ ██╔══██╗██╔═══██╗██║ ██╔╝    ██╔════╝██║     ██║\n" +
+  "  ██║  ███╗██████╔╝██║   ██║█████╔╝     ██║     ██║     ██║\n" +
+  "  ██║   ██║██╔══██╗██║   ██║██╔═██╗     ██║     ██║     ██║\n" +
+  "  ╚██████╔╝██║  ██║╚██████╔╝██║  ██╗    ╚██████╗███████╗██║\n" +
+  "   ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝     ╚═════╝╚══════╝╚═╝\n" +
+  '    🌟 "Code at the speed of thought" 🌟\n';
 
 export function EasterEggBanner() {
   return (
     <Box flexDirection="column" alignItems="center">
       <Text color="rainbow">{easterEggBanner}</Text>
-      <Text color="gray" italic>You found the secret banner! 🎉</Text>
+      <Text color="gray" italic>
+        You found the secret banner! 🎉
+      </Text>
     </Box>
   );
 }
