@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import pkg from '../../../package.json' with { type: 'json' };
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import pkg from "../../../package.json" with { type: "json" };
+import fs from "fs";
+import path from "path";
+import os from "os";
 
 import { Box, Text, DOMElement } from "ink";
 import { GrokAgent, ChatEntry } from "../../agent/grok-agent.js";
@@ -18,7 +18,10 @@ import ConfirmationDialog from "./confirmation-dialog.js";
 import { Banner } from "./banner.js";
 import { ContextTooltip } from "./context-tooltip.js";
 import { VersionNotification } from "./version-notification.js";
-import { PlanModeIndicator, PlanModeStatusIndicator } from "./plan-mode-indicator.js";
+import {
+  PlanModeIndicator,
+  PlanModeStatusIndicator,
+} from "./plan-mode-indicator.js";
 import ContextIndicator from "./context-indicator.js";
 import {
   ConfirmationService,
@@ -51,19 +54,18 @@ function ChatInterfaceWithAgent({
   const scrollRef = useRef<DOMElement | null>(null);
   const processingStartTime = useRef<number>(0);
   const lastChatHistoryLength = useRef<number>(0);
-  
+
   // Get context information for banner, tooltip, and context indicator
   const { contextInfo } = useContextInfo(agent);
 
   // Handle global keyboard shortcuts via input handler
   const handleGlobalShortcuts = (str: string, key: any) => {
-    if (key.ctrl && (str === 'i' || key.name === 'i')) {
-      setShowContextTooltip(prev => !prev);
+    if (key.ctrl && (str === "i" || key.name === "i")) {
+      setShowContextTooltip((prev) => !prev);
       return true;
     }
     return false;
   };
-
 
   const confirmationService = ConfirmationService.getInstance();
 
@@ -108,8 +110,6 @@ function ChatInterfaceWithAgent({
     // Add top padding
     console.log("    ");
 
-
-
     console.log(" ");
 
     // Generate welcome text with margin to match Ink paddingX={2}
@@ -133,13 +133,14 @@ function ChatInterfaceWithAgent({
   useEffect(() => {
     const newEntries = chatHistory.slice(lastChatHistoryLength.current);
     if (newEntries.length > 0) {
-      const sessionFile = path.join(os.homedir(), '.grok', 'session.log');
+      const sessionFile = path.join(os.homedir(), ".grok", "session.log");
       try {
         const dir = path.dirname(sessionFile);
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
         }
-        const lines = newEntries.map(entry => JSON.stringify(entry)).join('\n') + '\n';
+        const lines =
+          newEntries.map((entry) => JSON.stringify(entry)).join("\n") + "\n";
         fs.appendFileSync(sessionFile, lines);
       } catch {
         // Silently ignore session logging errors
@@ -167,25 +168,24 @@ function ChatInterfaceWithAgent({
           let accumulatedContent = "";
           let lastTokenCount = 0;
           let pendingToolCalls: GrokToolCall[] | null = null;
-          let pendingToolResults: Array<{ toolCall: GrokToolCall; toolResult: any }> = [];
+          let pendingToolResults: Array<{
+            toolCall: GrokToolCall;
+            toolResult: any;
+          }> = [];
           let lastUpdateTime = Date.now();
 
           const flushUpdates = () => {
             const now = Date.now();
-            if (now - lastUpdateTime < 500) return; // Throttle to ~2 FPS to reduce re-render frequency
+            if (now - lastUpdateTime < 100) return; // Throttle updates to prevent display corruption
 
             // Batch all chat history updates into a single setState call
             setChatHistory((prev) => {
               let newHistory = [...prev];
 
-              // Update token count if changed
-              if (lastTokenCount !== 0) {
-                // Note: token count is handled separately, not in chat history
-              }
-
-              // Handle accumulated content
+              // Handle accumulated content immediately
               if (accumulatedContent) {
                 if (!streamingEntry) {
+                  // Create new streaming entry
                   const newStreamingEntry = {
                     type: "assistant" as const,
                     content: accumulatedContent,
@@ -195,9 +195,16 @@ function ChatInterfaceWithAgent({
                   newHistory.push(newStreamingEntry);
                   streamingEntry = newStreamingEntry;
                 } else {
-                  const lastIdx = newHistory.length - 1;
-                  if (lastIdx >= 0 && newHistory[lastIdx].isStreaming) {
-                    newHistory[lastIdx] = { ...newHistory[lastIdx], content: newHistory[lastIdx].content + accumulatedContent };
+                  // Update existing streaming entry
+                  const streamingIdx = newHistory.findIndex(
+                    (entry) => entry.isStreaming,
+                  );
+                  if (streamingIdx >= 0) {
+                    newHistory[streamingIdx] = {
+                      ...newHistory[streamingIdx],
+                      content:
+                        newHistory[streamingIdx].content + accumulatedContent,
+                    };
                   }
                 }
                 accumulatedContent = "";
@@ -206,9 +213,15 @@ function ChatInterfaceWithAgent({
               // Handle pending tool calls
               if (pendingToolCalls) {
                 // Mark streaming entry as complete
-                const streamingIdx = newHistory.findIndex(entry => entry.isStreaming);
+                const streamingIdx = newHistory.findIndex(
+                  (entry) => entry.isStreaming,
+                );
                 if (streamingIdx >= 0) {
-                  newHistory[streamingIdx] = { ...newHistory[streamingIdx], isStreaming: false, toolCalls: pendingToolCalls };
+                  newHistory[streamingIdx] = {
+                    ...newHistory[streamingIdx],
+                    isStreaming: false,
+                    toolCalls: pendingToolCalls,
+                  };
                 }
                 streamingEntry = null;
 
@@ -233,7 +246,9 @@ function ChatInterfaceWithAgent({
                   }
                   // Update matching tool_call entries
                   const matchingResult = pendingToolResults.find(
-                    (result) => entry.type === "tool_call" && entry.toolCall?.id === result.toolCall.id
+                    (result) =>
+                      entry.type === "tool_call" &&
+                      entry.toolCall?.id === result.toolCall.id,
                   );
                   if (matchingResult) {
                     return {
@@ -262,7 +277,9 @@ function ChatInterfaceWithAgent({
             lastUpdateTime = now;
           };
 
-          for await (const chunk of agent.processUserMessageStream(initialMessage)) {
+          for await (const chunk of agent.processUserMessageStream(
+            initialMessage,
+          )) {
             switch (chunk.type) {
               case "content":
                 if (chunk.content) {
@@ -284,7 +301,10 @@ function ChatInterfaceWithAgent({
 
               case "tool_result":
                 if (chunk.toolCall && chunk.toolResult) {
-                  pendingToolResults.push({ toolCall: chunk.toolCall, toolResult: chunk.toolResult });
+                  pendingToolResults.push({
+                    toolCall: chunk.toolCall,
+                    toolResult: chunk.toolResult,
+                  });
                 }
                 break;
 
@@ -294,7 +314,7 @@ function ChatInterfaceWithAgent({
                 break;
             }
 
-            // Flush updates periodically
+            // Flush updates more frequently during streaming
             flushUpdates();
           }
 
@@ -303,13 +323,14 @@ function ChatInterfaceWithAgent({
           if (streamingEntry) {
             setChatHistory((prev) =>
               prev.map((entry) =>
-                entry.isStreaming ? { ...entry, isStreaming: false } : entry
-              )
+                entry.isStreaming ? { ...entry, isStreaming: false } : entry,
+              ),
             );
           }
           setIsStreaming(false);
         } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           const errorEntry: ChatEntry = {
             type: "assistant",
             content: `Error: ${errorMessage}`,
@@ -337,7 +358,7 @@ function ChatInterfaceWithAgent({
     return () => {
       confirmationService.off(
         "confirmation-requested",
-        handleConfirmationRequest
+        handleConfirmationRequest,
       );
     };
   }, [confirmationService]);
@@ -354,7 +375,7 @@ function ChatInterfaceWithAgent({
 
     const interval = setInterval(() => {
       setProcessingTime(
-        Math.floor((Date.now() - processingStartTime.current) / 1000)
+        Math.floor((Date.now() - processingStartTime.current) / 1000),
       );
     }, 1000);
 
@@ -379,7 +400,7 @@ function ChatInterfaceWithAgent({
   };
 
   const toggleContextTooltip = () => {
-    setShowContextTooltip(prev => !prev);
+    setShowContextTooltip((prev) => !prev);
   };
 
   return (
@@ -387,33 +408,37 @@ function ChatInterfaceWithAgent({
       {/* Show enhanced banner only when no chat history and no confirmation dialog */}
       {chatHistory.length === 0 && !confirmationOptions && (
         <Box flexDirection="column">
-          <Banner 
+          <Banner
             style="default"
             showContext={true}
             workspaceFiles={contextInfo.workspaceFiles}
             indexSize={contextInfo.indexSize}
             sessionRestored={contextInfo.sessionFiles > 0}
           />
-          
+
           <Box marginTop={1} flexDirection="column">
             <Text color="cyan" bold>
               💡 Quick Start Tips:
             </Text>
             <Box marginTop={1} flexDirection="column">
               <Text color="gray">
-                • <Text color="yellow">Ask anything:</Text> "Create a React component" or "Debug this Python script"
+                • <Text color="yellow">Ask anything:</Text> "Create a React
+                component" or "Debug this Python script"
               </Text>
               <Text color="gray">
-                • <Text color="yellow">Edit files:</Text> "Add error handling to app.js" 
+                • <Text color="yellow">Edit files:</Text> "Add error handling to
+                app.js"
               </Text>
               <Text color="gray">
-                • <Text color="yellow">Run commands:</Text> "Set up a new Node.js project"
+                • <Text color="yellow">Run commands:</Text> "Set up a new
+                Node.js project"
               </Text>
               <Text color="gray">
-                • <Text color="yellow">Get help:</Text> Type "/help" for all commands
+                • <Text color="yellow">Get help:</Text> Type "/help" for all
+                commands
               </Text>
             </Box>
-            
+
             <Box marginTop={1}>
               <Text color="cyan" bold>
                 🛠️ Power Features:
@@ -421,16 +446,20 @@ function ChatInterfaceWithAgent({
             </Box>
             <Box marginTop={1} flexDirection="column">
               <Text color="gray">
-                • <Text color="magenta">Auto-edit mode:</Text> Press Shift+Tab to toggle hands-free editing
+                • <Text color="magenta">Auto-edit mode:</Text> Press Shift+Tab
+                to toggle hands-free editing
               </Text>
               <Text color="gray">
-                • <Text color="magenta">Project memory:</Text> Create .grok/GROK.md to customize behavior
+                • <Text color="magenta">Project memory:</Text> Create
+                .grok/GROK.md to customize behavior
               </Text>
               <Text color="gray">
-                • <Text color="magenta">Documentation:</Text> Run "/init-agent" for .agent docs system
+                • <Text color="magenta">Documentation:</Text> Run "/init-agent"
+                for .agent docs system
               </Text>
               <Text color="gray">
-                • <Text color="magenta">Error recovery:</Text> Run "/heal" after errors to add guardrails
+                • <Text color="magenta">Error recovery:</Text> Run "/heal" after
+                errors to add guardrails
               </Text>
             </Box>
           </Box>
@@ -475,12 +504,12 @@ function ChatInterfaceWithAgent({
             isActive={isProcessing || isStreaming}
             processingTime={processingTime}
             tokenCount={tokenCount}
-            operation={isStreaming ? 'thinking' : 'process'}
+            operation={isStreaming ? "thinking" : "process"}
             progress={undefined} // TODO: Add progress tracking for long operations
           />
 
           <VersionNotification isVisible={!isProcessing && !isStreaming} />
-          
+
           {/* Plan Mode Detailed Indicator */}
           {planMode.isActive && (
             <Box marginBottom={1}>
@@ -493,7 +522,7 @@ function ChatInterfaceWithAgent({
               />
             </Box>
           )}
-          
+
           <ChatInput
             input={input}
             cursorPosition={cursorPosition}
@@ -567,7 +596,7 @@ export default function ChatInterface({
   initialMessage,
 }: ChatInterfaceProps) {
   const [currentAgent, setCurrentAgent] = useState<GrokAgent | null>(
-    agent || null
+    agent || null,
   );
 
   const handleApiKeySet = (newAgent: GrokAgent) => {

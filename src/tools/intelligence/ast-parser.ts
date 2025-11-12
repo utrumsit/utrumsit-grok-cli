@@ -2,19 +2,39 @@ import { ToolResult } from "../../types/index.js";
 import { parse as parseTS } from "@typescript-eslint/typescript-estree";
 
 // Conditional tree-sitter imports for development compatibility
-let Parser: any;
-let JavaScript: any;
-let TypeScript: any;
-let Python: any;
+// Use type imports to keep TypeScript happy (avoids 'any' sloppiness)
+import type { Parser as TSParser } from 'tree-sitter';
+import type { Language as TSLanguage } from 'tree-sitter';
+
+// Initialize with explicit types
+let Parser: TSParser | null = null;
+let JavaScript: TSLanguage | null = null;
+let TypeScript: TSLanguage | null = null;
+let Python: TSLanguage | null = null;
 
 try {
-  Parser = require("tree-sitter");
-  JavaScript = require("tree-sitter-javascript");
-  TypeScript = require("tree-sitter-typescript");
-  Python = require("tree-sitter-python");
+  // Dynamic ESM imports for Tree-sitter modules
+  const tsModule = await import('tree-sitter');
+  Parser = tsModule.default || tsModule; // Handle default export or module
+  JavaScript = (await import('tree-sitter-javascript')).default;
+  TypeScript = (await import('tree-sitter-typescript')).default;
+  Python = (await import('tree-sitter-python')).default;
+
+  // Debug log to confirm loading
+  console.log('Tree-sitter modules loaded successfully:', {
+    Parser: !!Parser,
+    JavaScript: !!JavaScript,
+    TypeScript: !!TypeScript,
+    Python: !!Python,
+  });
 } catch (error) {
-  console.warn("Tree-sitter modules not available, falling back to TypeScript-only parsing");
+  // Detailed error logging for debugging
+  console.warn(
+    'Tree-sitter modules not available, falling back to TypeScript-only parsing.',
+    'Error:', error instanceof Error ? error.message : String(error)
+  );
 }
+
 import * as ops from "fs";
 
 const pathExists = async (filePath: string): Promise<boolean> => {

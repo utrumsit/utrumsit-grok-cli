@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput } from 'ink';
-import { Agent } from '../agent/index.js';
-import { ToolResult } from '../types/index.js';
-import { ConfirmationService, ConfirmationOptions } from '../utils/confirmation-service.js';
-import ConfirmationDialog from './components/confirmation-dialog.js';
+import React, { useState, useEffect } from "react";
+import { Box, Text, useInput } from "ink";
+import { Agent } from "../agent/index.js";
+import { ToolResult } from "../types/index.js";
+import {
+  ConfirmationService,
+  ConfirmationOptions,
+} from "../utils/confirmation-service.js";
+import ConfirmationDialog from "./components/confirmation-dialog.js";
 // Import chalk removed - not used
 
 interface Props {
@@ -11,12 +14,15 @@ interface Props {
 }
 
 export default function App({ agent }: Props) {
-  const [input, setInput] = useState('');
-  const [history, setHistory] = useState<Array<{ command: string; result: ToolResult }>>([]);
+  const [input, setInput] = useState("");
+  const [history, setHistory] = useState<
+    Array<{ command: string; result: ToolResult }>
+  >([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [confirmationOptions, setConfirmationOptions] = useState<ConfirmationOptions | null>(null);
+  const [confirmationOptions, setConfirmationOptions] =
+    useState<ConfirmationOptions | null>(null);
   // Removed useApp().exit - using process.exit(0) instead for better terminal handling
-  
+
   const confirmationService = ConfirmationService.getInstance();
 
   useEffect(() => {
@@ -24,10 +30,13 @@ export default function App({ agent }: Props) {
       setConfirmationOptions(options);
     };
 
-    confirmationService.on('confirmation-requested', handleConfirmationRequest);
+    confirmationService.on("confirmation-requested", handleConfirmationRequest);
 
     return () => {
-      confirmationService.off('confirmation-requested', handleConfirmationRequest);
+      confirmationService.off(
+        "confirmation-requested",
+        handleConfirmationRequest,
+      );
     };
   }, [confirmationService]);
 
@@ -41,13 +50,13 @@ export default function App({ agent }: Props) {
     if (confirmationOptions) {
       return;
     }
-    if (key.ctrl && inputChar === 'c') {
+    if (key.ctrl && inputChar === "c") {
       process.exit(0);
       return;
     }
 
     if (key.return) {
-      if (input.trim() === 'exit' || input.trim() === 'quit') {
+      if (input.trim() === "exit" || input.trim() === "quit") {
         process.exit(0);
         return;
       }
@@ -55,20 +64,20 @@ export default function App({ agent }: Props) {
       if (input.trim()) {
         setIsProcessing(true);
         const result = await agent.processCommand(input.trim());
-        setHistory(prev => [...prev, { command: input.trim(), result }]);
-        setInput('');
+        setHistory((prev) => [...prev, { command: input.trim(), result }]);
+        setInput("");
         setIsProcessing(false);
       }
       return;
     }
 
     if (key.backspace || key.delete) {
-      setInput(prev => prev.slice(0, -1));
+      setInput((prev) => prev.slice(0, -1));
       return;
     }
 
     if (inputChar && !key.ctrl && !key.meta) {
-      setInput(prev => prev + inputChar);
+      setInput((prev) => prev + inputChar);
     }
   });
 
@@ -78,8 +87,8 @@ export default function App({ agent }: Props) {
         <Box flexDirection="column" marginBottom={1}>
           <Text color="green">✓ Success</Text>
           {result.output && (
-            <Box marginLeft={2}>
-              <Text>{result.output}</Text>
+            <Box marginX={2}>
+              <Text wrap="wrap">{result.output}</Text>
             </Box>
           )}
         </Box>
@@ -89,8 +98,10 @@ export default function App({ agent }: Props) {
         <Box flexDirection="column" marginBottom={1}>
           <Text color="red">✗ Error</Text>
           {result.error && (
-            <Box marginLeft={2}>
-              <Text color="red">{result.error}</Text>
+            <Box marginX={2}>
+              <Text wrap="wrap" color="red">
+                {result.error}
+              </Text>
             </Box>
           )}
         </Box>
@@ -127,18 +138,19 @@ export default function App({ agent }: Props) {
           🔧 Grok CLI - Text Editor Agent
         </Text>
       </Box>
-      
+
       <Box flexDirection="column" marginBottom={1}>
         <Text dimColor>
-          Available commands: view, str_replace, create, insert, undo_edit, bash, help
+          Available commands: view, str_replace, create, insert, undo_edit,
+          bash, help
         </Text>
         <Text dimColor>
           Type 'help' for detailed usage, 'exit' or Ctrl+C to quit
         </Text>
       </Box>
 
-      <Box flexDirection="column" marginBottom={1}>
-        {history.slice(-10).map((entry, index) => (
+      <Box flexDirection="column" marginBottom={1} flexGrow={1}>
+        {history.slice(-20).map((entry, index) => (
           <Box key={index} flexDirection="column" marginBottom={1}>
             <Box>
               <Text color="blue">$ </Text>

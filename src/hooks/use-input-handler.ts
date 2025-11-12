@@ -4,15 +4,16 @@ import path from "path";
 import { GrokAgent, ChatEntry } from "../agent/grok-agent.js";
 import { ConfirmationService } from "../utils/confirmation-service.js";
 import { useEnhancedInput, Key } from "./use-enhanced-input.js";
-import { GrokToolCall } from "../grok/client.js";
-import { ToolResult } from "../types/index.js";
 import { PasteEvent } from "../services/paste-detection.js";
 import { usePlanMode } from "./use-plan-mode.js";
 
 import { filterCommandSuggestions } from "../ui/components/command-suggestions.js";
 import { loadModelConfig, updateCurrentModel } from "../utils/model-config.js";
 import { AgentSystemGenerator } from "../tools/documentation/agent-system-generator.js";
-import { generateDocsMenuText, findDocsMenuOption } from "../tools/documentation/docs-menu.js";
+import {
+  generateDocsMenuText,
+  findDocsMenuOption,
+} from "../tools/documentation/docs-menu.js";
 import { ReadmeGenerator } from "../tools/documentation/readme-generator.js";
 import { CommentsGenerator } from "../tools/documentation/comments-generator.js";
 import { ApiDocsGenerator } from "../tools/documentation/api-docs-generator.js";
@@ -82,50 +83,51 @@ export function useInputHandler({
       return true; // Prevent default handling
     }
 
-
     // Handle shift+tab for both auto-edit and plan mode activation
     if (key.shift && key.tab) {
       const now = Date.now();
       const timeSinceLastPress = now - lastShiftTabTime;
-      
+
       // Reset count if more than 2 seconds have passed
       if (timeSinceLastPress > 2000) {
         setShiftTabPressCount(1);
       } else {
-        setShiftTabPressCount(prev => prev + 1);
+        setShiftTabPressCount((prev) => prev + 1);
       }
-      
+
       setLastShiftTabTime(now);
-      
+
       // Check for plan mode activation (shift+tab twice within 2 seconds)
       if (shiftTabPressCount >= 2) {
         // Second shift+tab press - activate plan mode
         if (!planMode.isActive) {
           planMode.activatePlanMode();
-          
+
           const planModeEntry: ChatEntry = {
             type: "assistant",
-            content: "🎯 **Plan Mode Activated**\n\nEntering read-only exploration mode. I'll analyze your codebase and formulate an implementation strategy before making any changes.\n\n**What I'm doing:**\n• Exploring project structure\n• Analyzing dependencies and patterns\n• Identifying key components\n• Formulating implementation approach\n\nOnce complete, I'll present a detailed plan for your approval.\n\n💡 **Tip**: Describe what you want to implement and I'll create a comprehensive plan first.",
+            content:
+              "🎯 **Plan Mode Activated**\n\nEntering read-only exploration mode. I'll analyze your codebase and formulate an implementation strategy before making any changes.\n\n**What I'm doing:**\n• Exploring project structure\n• Analyzing dependencies and patterns\n• Identifying key components\n• Formulating implementation approach\n\nOnce complete, I'll present a detailed plan for your approval.\n\n💡 **Tip**: Describe what you want to implement and I'll create a comprehensive plan first.",
             timestamp: new Date(),
           };
           setChatHistory((prev) => [...prev, planModeEntry]);
-          
+
           // Start exploration automatically
           planMode.startExploration();
-          
+
           setShiftTabPressCount(0); // Reset counter
           return true;
         } else {
           // Already in plan mode - exit plan mode
-          planMode.deactivatePlanMode('user_requested');
-          
+          planMode.deactivatePlanMode("user_requested");
+
           const exitEntry: ChatEntry = {
-            type: "assistant", 
-            content: "🎯 **Plan Mode Deactivated**\n\nExiting plan mode and returning to normal operation.",
+            type: "assistant",
+            content:
+              "🎯 **Plan Mode Deactivated**\n\nExiting plan mode and returning to normal operation.",
             timestamp: new Date(),
           };
           setChatHistory((prev) => [...prev, exitEntry]);
-          
+
           setShiftTabPressCount(0); // Reset counter
           return true;
         }
@@ -142,11 +144,11 @@ export function useInputHandler({
           // Disable auto-edit: reset session flags
           confirmationService.resetSession();
         }
-        
+
         // Reset plan mode counter if we're handling auto-edit
         setTimeout(() => setShiftTabPressCount(0), 2500);
       }
-      
+
       return true; // Handled
     }
 
@@ -178,7 +180,7 @@ export function useInputHandler({
     if (showCommandSuggestions) {
       const filteredSuggestions = filterCommandSuggestions(
         commandSuggestions,
-        input
+        input,
       );
 
       if (filteredSuggestions.length === 0) {
@@ -188,20 +190,20 @@ export function useInputHandler({
       } else {
         if (key.upArrow) {
           setSelectedCommandIndex((prev) =>
-            prev === 0 ? filteredSuggestions.length - 1 : prev - 1
+            prev === 0 ? filteredSuggestions.length - 1 : prev - 1,
           );
           return true;
         }
         if (key.downArrow) {
           setSelectedCommandIndex(
-            (prev) => (prev + 1) % filteredSuggestions.length
+            (prev) => (prev + 1) % filteredSuggestions.length,
           );
           return true;
         }
         if (key.tab || key.return) {
           const safeIndex = Math.min(
             selectedCommandIndex,
-            filteredSuggestions.length - 1
+            filteredSuggestions.length - 1,
           );
           const selectedCommand = filteredSuggestions[safeIndex];
           const newInput = selectedCommand.command + " ";
@@ -218,7 +220,7 @@ export function useInputHandler({
     if (showModelSelection) {
       if (key.upArrow) {
         setSelectedModelIndex((prev) =>
-          prev === 0 ? availableModels.length - 1 : prev - 1
+          prev === 0 ? availableModels.length - 1 : prev - 1,
         );
         return true;
       }
@@ -263,8 +265,8 @@ export function useInputHandler({
     // Create a user entry with paste summary for display
     const userEntry: ChatEntry = {
       type: "user",
-      content: pasteEvent.content,           // Full content for AI
-      displayContent: pasteEvent.summary,    // Summary for UI display
+      content: pasteEvent.content, // Full content for AI
+      displayContent: pasteEvent.summary, // Summary for UI display
       timestamp: new Date(),
       isPasteSummary: true,
       pasteMetadata: {
@@ -313,7 +315,7 @@ export function useInputHandler({
     if (onGlobalShortcut && onGlobalShortcut(inputChar, key)) {
       return; // Handled by global shortcut
     }
-    
+
     handleInput(inputChar, key);
   });
 
@@ -329,14 +331,26 @@ export function useInputHandler({
     { command: "/upgrade", description: "Check for updates and upgrade CLI" },
     { command: "/version", description: "Show version information" },
     { command: "/switch", description: "Switch to specific version" },
-    { command: "/init-agent", description: "Initialize .agent documentation system" },
+    {
+      command: "/init-agent",
+      description: "Initialize .agent documentation system",
+    },
     { command: "/docs", description: "Documentation generation menu" },
     { command: "/readme", description: "Generate project README.md" },
     { command: "/api-docs", description: "Generate API documentation" },
-    { command: "/changelog", description: "Generate changelog from git history" },
-    { command: "/update-agent-docs", description: "Update .agent docs with recent changes" },
+    {
+      command: "/changelog",
+      description: "Generate changelog from git history",
+    },
+    {
+      command: "/update-agent-docs",
+      description: "Update .agent docs with recent changes",
+    },
     { command: "/compact", description: "Compress conversation history" },
-    { command: "/heal", description: "Document and prevent failure recurrence" },
+    {
+      command: "/heal",
+      description: "Document and prevent failure recurrence",
+    },
     { command: "/guardrails", description: "Manage prevention rules" },
     { command: "/comments", description: "Add code comments to files" },
     { command: "/commit-and-push", description: "AI commit & push to remote" },
@@ -486,9 +500,10 @@ Available models: ${modelNames.join(", ")}`,
 
 Current Version: **${versionInfo.current}**
 Latest Version: **${versionInfo.latest}**
-${versionInfo.isUpdateAvailable 
-  ? `🔄 **Update Available!**\n\nUse \`/upgrade\` to update automatically or run:\n\`${versionInfo.updateCommand}\``
-  : '✅ **You are up to date!**'
+${
+  versionInfo.isUpdateAvailable
+    ? `🔄 **Update Available!**\n\nUse \`/upgrade\` to update automatically or run:\n\`${versionInfo.updateCommand}\``
+    : "✅ **You are up to date!**"
 }
 
 Package: ${pkg.name}
@@ -500,7 +515,7 @@ NPM: https://www.npmjs.com/package/${pkg.name}`,
       } catch (error) {
         const errorEntry: ChatEntry = {
           type: "assistant",
-          content: `❌ Error checking version: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          content: `❌ Error checking version: ${error instanceof Error ? error.message : "Unknown error"}`,
           timestamp: new Date(),
         };
         setChatHistory((prev) => [...prev, errorEntry]);
@@ -512,7 +527,7 @@ NPM: https://www.npmjs.com/package/${pkg.name}`,
     if (trimmedInput === "/upgrade") {
       try {
         const versionInfo = await checkForUpdates();
-        
+
         if (!versionInfo.isUpdateAvailable) {
           const upToDateEntry: ChatEntry = {
             type: "assistant",
@@ -535,12 +550,12 @@ Upgrading now... This may take a moment.`,
           timestamp: new Date(),
         };
         setChatHistory((prev) => [...prev, confirmUpgradeEntry]);
-        
+
         const success = await autoUpgrade();
-        
+
         const resultEntry: ChatEntry = {
           type: "assistant",
-          content: success 
+          content: success
             ? `✅ **Upgrade Complete!**\n\nSuccessfully upgraded to version **${versionInfo.latest}**.\n\n**Please restart Grok CLI** to use the new version:\n- Exit with \`/exit\` or Ctrl+C\n- Run \`grok\` again`
             : `❌ **Upgrade Failed**\n\nPlease try upgrading manually:\n\`${versionInfo.updateCommand}\``,
           timestamp: new Date(),
@@ -549,7 +564,7 @@ Upgrading now... This may take a moment.`,
       } catch (error) {
         const errorEntry: ChatEntry = {
           type: "assistant",
-          content: `❌ Error during upgrade: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          content: `❌ Error during upgrade: ${error instanceof Error ? error.message : "Unknown error"}`,
           timestamp: new Date(),
         };
         setChatHistory((prev) => [...prev, errorEntry]);
@@ -560,7 +575,7 @@ Upgrading now... This may take a moment.`,
 
     if (trimmedInput.startsWith("/switch ")) {
       const versionArg = trimmedInput.split(" ")[1];
-      
+
       if (!versionArg) {
         const helpEntry: ChatEntry = {
           type: "assistant",
@@ -592,11 +607,11 @@ Command: \`npm install -g ${pkg.name}@<version>\``,
         const { exec } = await import("child_process");
         const { promisify } = await import("util");
         const execAsync = promisify(exec);
-        
+
         await execAsync(`npm install -g ${pkg.name}@${versionArg}`, {
           timeout: 30000,
         });
-        
+
         const successEntry: ChatEntry = {
           type: "assistant",
           content: `✅ **Version Switch Complete!**\n\nSuccessfully installed version **${versionArg}**.\n\n**Please restart Grok CLI** to use the new version:\n- Exit with \`/exit\` or Ctrl+C\n- Run \`grok\` again`,
@@ -606,7 +621,7 @@ Command: \`npm install -g ${pkg.name}@<version>\``,
       } catch (error) {
         const errorEntry: ChatEntry = {
           type: "assistant",
-          content: `❌ **Version switch failed**\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try manually:\n\`npm install -g ${pkg.name}@${versionArg}\``,
+          content: `❌ **Version switch failed**\n\nError: ${error instanceof Error ? error.message : "Unknown error"}\n\nPlease try manually:\n\`npm install -g ${pkg.name}@${versionArg}\``,
           timestamp: new Date(),
         };
         setChatHistory((prev) => [...prev, errorEntry]);
@@ -629,7 +644,7 @@ Command: \`npm install -g ${pkg.name}@<version>\``,
       try {
         // First check if there are any changes at all
         const initialStatusResult = await agent.executeBashCommand(
-          "git status --porcelain"
+          "git status --porcelain",
         );
 
         if (
@@ -704,7 +719,7 @@ Respond with ONLY the commit message, no additional text.`;
         let lastCommitUpdateTime = Date.now();
 
         for await (const chunk of agent.processUserMessageStream(
-          commitPrompt
+          commitPrompt,
         )) {
           if (chunk.type === "content" && chunk.content) {
             accumulatedCommitContent += chunk.content;
@@ -728,8 +743,8 @@ Respond with ONLY the commit message, no additional text.`;
                           ...entry,
                           content: `Generating commit message...\n\n${commitMessage}`,
                         }
-                      : entry
-                  )
+                      : entry,
+                  ),
                 );
               }
               accumulatedCommitContent = "";
@@ -745,8 +760,8 @@ Respond with ONLY the commit message, no additional text.`;
                         content: `Generated commit message: "${commitMessage.trim()}"`,
                         isStreaming: false,
                       }
-                    : entry
-                )
+                    : entry,
+                ),
               );
             }
             break;
@@ -837,16 +852,16 @@ Respond with ONLY the commit message, no additional text.`;
 
       try {
         // Determine project type - assume external project for now, could detect Grok CLI
-        const isGrokCli = process.cwd().includes('grok-cli') || 
-                         trimmedInput.includes('--grok');
-        
-        const projectType = isGrokCli ? 'grok-cli' : 'external';
-        const projectName = isGrokCli ? 'Grok CLI' : 'Current Project';
+        const isGrokCli =
+          process.cwd().includes("grok-cli") || trimmedInput.includes("--grok");
+
+        const projectType = isGrokCli ? "grok-cli" : "external";
+        const projectName = isGrokCli ? "Grok CLI" : "Current Project";
 
         const generator = new AgentSystemGenerator({
           projectName,
           projectType,
-          rootPath: process.cwd()
+          rootPath: process.cwd(),
         });
 
         const result = await generator.generateAgentSystem();
@@ -874,7 +889,6 @@ Respond with ONLY the commit message, no additional text.`;
           };
           setChatHistory((prev) => [...prev, nextStepsEntry]);
         }
-
       } catch (error: any) {
         const errorEntry: ChatEntry = {
           type: "assistant",
@@ -912,7 +926,7 @@ Respond with ONLY the commit message, no additional text.`;
     const docsMenuOption = findDocsMenuOption(trimmedInput);
     if (docsMenuOption) {
       const userEntry: ChatEntry = {
-        type: "user", 
+        type: "user",
         content: trimmedInput,
         timestamp: new Date(),
       };
@@ -945,15 +959,18 @@ Respond with ONLY the commit message, no additional text.`;
       setIsProcessing(true);
 
       try {
-        const args = trimmedInput.split(' ').slice(1);
-        const updateExisting = args.includes('--update');
-        const template = args.find(arg => arg.startsWith('--template='))?.split('=')[1] as any || 'default';
+        const args = trimmedInput.split(" ").slice(1);
+        const updateExisting = args.includes("--update");
+        const template =
+          (args
+            .find((arg) => arg.startsWith("--template="))
+            ?.split("=")[1] as any) || "default";
 
         const generator = new ReadmeGenerator({
-          projectName: '', // Will be auto-detected
+          projectName: "", // Will be auto-detected
           rootPath: process.cwd(),
           updateExisting,
-          template
+          template,
         });
 
         const result = await generator.generateReadme();
@@ -981,10 +998,9 @@ Respond with ONLY the commit message, no additional text.`;
           };
           setChatHistory((prev) => [...prev, nextStepsEntry]);
         }
-
       } catch (error: any) {
         const errorEntry: ChatEntry = {
-          type: "assistant", 
+          type: "assistant",
           content: `Failed to generate README: ${error.message}`,
           timestamp: new Date(),
         };
@@ -1007,13 +1023,14 @@ Respond with ONLY the commit message, no additional text.`;
       setIsProcessing(true);
 
       try {
-        const args = trimmedInput.split(' ').slice(1);
+        const args = trimmedInput.split(" ").slice(1);
         const filePath = args[0];
 
         if (!filePath) {
           const errorEntry: ChatEntry = {
             type: "assistant",
-            content: "❌ Please specify a file path. Usage: `/comments <file-path>`\n\nExample: `/comments src/utils/helper.ts`",
+            content:
+              "❌ Please specify a file path. Usage: `/comments <file-path>`\n\nExample: `/comments src/utils/helper.ts`",
             timestamp: new Date(),
           };
           setChatHistory((prev) => [...prev, errorEntry]);
@@ -1022,13 +1039,18 @@ Respond with ONLY the commit message, no additional text.`;
           return true;
         }
 
-        const commentType = args.includes('--functions') ? 'functions' : 
-                           args.includes('--classes') ? 'classes' : 'all';
+        const commentType = args.includes("--functions")
+          ? "functions"
+          : args.includes("--classes")
+            ? "classes"
+            : "all";
 
         const generator = new CommentsGenerator({
-          filePath: filePath.startsWith('/') ? filePath : path.join(process.cwd(), filePath),
+          filePath: filePath.startsWith("/")
+            ? filePath
+            : path.join(process.cwd(), filePath),
           commentType,
-          style: 'auto'
+          style: "auto",
         });
 
         const result = await generator.generateComments();
@@ -1055,7 +1077,6 @@ Respond with ONLY the commit message, no additional text.`;
           };
           setChatHistory((prev) => [...prev, tipsEntry]);
         }
-
       } catch (error: any) {
         const errorEntry: ChatEntry = {
           type: "assistant",
@@ -1081,16 +1102,18 @@ Respond with ONLY the commit message, no additional text.`;
       setIsProcessing(true);
 
       try {
-        const args = trimmedInput.split(' ').slice(1);
-        const outputFormat = args.includes('--format=html') ? 'html' : 'md';
-        const includePrivate = args.includes('--private');
-        const scanPaths = args.filter(arg => !arg.startsWith('--') && arg !== '');
+        const args = trimmedInput.split(" ").slice(1);
+        const outputFormat = args.includes("--format=html") ? "html" : "md";
+        const includePrivate = args.includes("--private");
+        const scanPaths = args.filter(
+          (arg) => !arg.startsWith("--") && arg !== "",
+        );
 
         const generator = new ApiDocsGenerator({
           rootPath: process.cwd(),
           outputFormat,
           includePrivate,
-          scanPaths: scanPaths.length > 0 ? scanPaths : ['src/']
+          scanPaths: scanPaths.length > 0 ? scanPaths : ["src/"],
         });
 
         const result = await generator.generateApiDocs();
@@ -1120,7 +1143,6 @@ Respond with ONLY the commit message, no additional text.`;
           };
           setChatHistory((prev) => [...prev, tipsEntry]);
         }
-
       } catch (error: any) {
         const errorEntry: ChatEntry = {
           type: "assistant",
@@ -1135,7 +1157,10 @@ Respond with ONLY the commit message, no additional text.`;
       return true;
     }
 
-    if (trimmedInput === "/changelog" || trimmedInput.startsWith("/changelog ")) {
+    if (
+      trimmedInput === "/changelog" ||
+      trimmedInput.startsWith("/changelog ")
+    ) {
       const userEntry: ChatEntry = {
         type: "user",
         content: trimmedInput,
@@ -1146,17 +1171,21 @@ Respond with ONLY the commit message, no additional text.`;
       setIsProcessing(true);
 
       try {
-        const args = trimmedInput.split(' ').slice(1);
-        const sinceVersion = args.find(arg => arg.startsWith('--since='))?.split('=')[1];
-        const commitCount = args.find(arg => arg.startsWith('--commits='))?.split('=')[1];
-        const format = args.includes('--simple') ? 'simple' : 'conventional';
+        const args = trimmedInput.split(" ").slice(1);
+        const sinceVersion = args
+          .find((arg) => arg.startsWith("--since="))
+          ?.split("=")[1];
+        const commitCount = args
+          .find((arg) => arg.startsWith("--commits="))
+          ?.split("=")[1];
+        const format = args.includes("--simple") ? "simple" : "conventional";
 
         const generator = new ChangelogGenerator({
           rootPath: process.cwd(),
           sinceVersion,
           commitCount: commitCount ? parseInt(commitCount) : undefined,
           format,
-          includeBreaking: true
+          includeBreaking: true,
         });
 
         const result = await generator.generateChangelog();
@@ -1186,7 +1215,6 @@ Respond with ONLY the commit message, no additional text.`;
           };
           setChatHistory((prev) => [...prev, tipsEntry]);
         }
-
       } catch (error: any) {
         const errorEntry: ChatEntry = {
           type: "assistant",
@@ -1201,7 +1229,10 @@ Respond with ONLY the commit message, no additional text.`;
       return true;
     }
 
-    if (trimmedInput === "/update-agent-docs" || trimmedInput.startsWith("/update-agent-docs ")) {
+    if (
+      trimmedInput === "/update-agent-docs" ||
+      trimmedInput.startsWith("/update-agent-docs ")
+    ) {
       const userEntry: ChatEntry = {
         type: "user",
         content: trimmedInput,
@@ -1212,16 +1243,20 @@ Respond with ONLY the commit message, no additional text.`;
       setIsProcessing(true);
 
       try {
-        const args = trimmedInput.split(' ').slice(1);
-        const updateTarget = args.includes('--system') ? 'system' :
-                            args.includes('--tasks') ? 'tasks' :
-                            args.includes('--sop') ? 'sop' : 'all';
-        const autoCommit = args.includes('--commit');
+        const args = trimmedInput.split(" ").slice(1);
+        const updateTarget = args.includes("--system")
+          ? "system"
+          : args.includes("--tasks")
+            ? "tasks"
+            : args.includes("--sop")
+              ? "sop"
+              : "all";
+        const autoCommit = args.includes("--commit");
 
         const updater = new UpdateAgentDocs({
           rootPath: process.cwd(),
           updateTarget,
-          autoCommit
+          autoCommit,
         });
 
         const result = await updater.updateDocs();
@@ -1236,12 +1271,11 @@ Respond with ONLY the commit message, no additional text.`;
         if (result.success && result.suggestions.length > 0) {
           const suggestionsEntry: ChatEntry = {
             type: "assistant",
-            content: `💡 **Suggestions for Manual Review:**\n\n${result.suggestions.map(s => `- ${s}`).join('\n')}\n\n**Options:**\n- \`/update-agent-docs --system\` - Update only system docs\n- \`/update-agent-docs --tasks\` - Update only tasks docs\n- \`/update-agent-docs --sop\` - Update only SOPs`,
+            content: `💡 **Suggestions for Manual Review:**\n\n${result.suggestions.map((s) => `- ${s}`).join("\n")}\n\n**Options:**\n- \`/update-agent-docs --system\` - Update only system docs\n- \`/update-agent-docs --tasks\` - Update only tasks docs\n- \`/update-agent-docs --sop\` - Update only SOPs`,
             timestamp: new Date(),
           };
           setChatHistory((prev) => [...prev, suggestionsEntry]);
         }
-
       } catch (error: any) {
         const errorEntry: ChatEntry = {
           type: "assistant",
@@ -1267,29 +1301,29 @@ Respond with ONLY the commit message, no additional text.`;
       setIsProcessing(true);
 
       try {
-        const args = trimmedInput.split(' ').slice(1);
+        const args = trimmedInput.split(" ").slice(1);
         // const force = args.includes('--force'); // TODO: implement force flag
-        const dryRun = args.includes('--dry-run');
+        const dryRun = args.includes("--dry-run");
 
         // Simulate context compression using subagent framework
         const subagentFramework = new SubagentFramework();
         const taskId = await subagentFramework.spawnSubagent({
-          type: 'summarizer',
+          type: "summarizer",
           input: {
-            content: chatHistory.map(entry => entry.content).join('\n'),
-            compressionTarget: 0.3 // 70% reduction
+            content: chatHistory.map((entry) => entry.content).join("\n"),
+            compressionTarget: 0.3, // 70% reduction
           },
-          priority: 'medium'
+          priority: "medium",
         });
 
         const result = await subagentFramework.waitForResult(taskId, 10000);
 
         if (result.success) {
           // const metrics = subagentFramework.getPerformanceMetrics(); // TODO: use metrics
-          
+
           const resultEntry: ChatEntry = {
             type: "assistant",
-            content: dryRun 
+            content: dryRun
               ? `📊 **Compression Preview (Dry Run)**\n\n${result.summary}\n\n💡 Use \`/compact\` to apply compression`
               : `🧹 **Context Compressed Successfully**\n\n${result.summary}\n\n📈 **Performance:**\n- Tokens saved: ~${result.output.compressionRatio * 100}%\n- Processing time: ${result.executionTime}ms\n- Subagent tokens used: ${result.tokensUsed}`,
             timestamp: new Date(),
@@ -1306,7 +1340,6 @@ Respond with ONLY the commit message, no additional text.`;
             setChatHistory((prev) => [...prev, tipsEntry]);
           }
         }
-
       } catch (error: any) {
         const errorEntry: ChatEntry = {
           type: "assistant",
@@ -1341,15 +1374,18 @@ Respond with ONLY the commit message, no additional text.`;
         // For demo purposes, create a simulated error
         const mockError = {
           message: "Example error for demonstration",
-          stack: "at someFunction (src/example.ts:42:10)"
+          stack: "at someFunction (src/example.ts:42:10)",
         };
         const mockContext = {
           command: trimmedInput,
           operation: "heal-demo",
-          files: ["src/example.ts"]
+          files: ["src/example.ts"],
         };
 
-        const result = await healingSystem.captureIncident(mockError, mockContext);
+        const result = await healingSystem.captureIncident(
+          mockError,
+          mockContext,
+        );
 
         const resultEntry: ChatEntry = {
           type: "assistant",
@@ -1381,7 +1417,6 @@ Respond with ONLY the commit message, no additional text.`;
           };
           setChatHistory((prev) => [...prev, tipsEntry]);
         }
-
       } catch (error: any) {
         const errorEntry: ChatEntry = {
           type: "assistant",
@@ -1396,7 +1431,10 @@ Respond with ONLY the commit message, no additional text.`;
       return true;
     }
 
-    if (trimmedInput === "/guardrails" || trimmedInput.startsWith("/guardrails ")) {
+    if (
+      trimmedInput === "/guardrails" ||
+      trimmedInput.startsWith("/guardrails ")
+    ) {
       const userEntry: ChatEntry = {
         type: "user",
         content: trimmedInput,
@@ -1407,18 +1445,21 @@ Respond with ONLY the commit message, no additional text.`;
       setIsProcessing(true);
 
       try {
-        const args = trimmedInput.split(' ').slice(1);
-        const check = args.includes('--check');
+        const args = trimmedInput.split(" ").slice(1);
+        const check = args.includes("--check");
         // const enable = args.find(arg => arg.startsWith('--enable'))?.split('=')[1]; // TODO: implement enable flag
         // const disable = args.find(arg => arg.startsWith('--disable'))?.split('=')[1]; // TODO: implement disable flag
 
         const healingSystem = new SelfHealingSystem(process.cwd());
 
         if (check) {
-          const checkResult = await healingSystem.checkGuardrails('example-operation', {});
+          const checkResult = await healingSystem.checkGuardrails(
+            "example-operation",
+            {},
+          );
           const resultEntry: ChatEntry = {
             type: "assistant",
-            content: `🛡️ **Guardrail Check Results**\n\n**Status:** ${checkResult.passed ? '✅ All Clear' : '❌ Violations Found'}\n**Violations:** ${checkResult.violations.length}\n**Warnings:** ${checkResult.warnings.length}`,
+            content: `🛡️ **Guardrail Check Results**\n\n**Status:** ${checkResult.passed ? "✅ All Clear" : "❌ Violations Found"}\n**Violations:** ${checkResult.violations.length}\n**Warnings:** ${checkResult.warnings.length}`,
             timestamp: new Date(),
           };
           setChatHistory((prev) => [...prev, resultEntry]);
@@ -1426,17 +1467,20 @@ Respond with ONLY the commit message, no additional text.`;
           // List all guardrails
           const incidents = await healingSystem.listIncidents();
           const config = healingSystem.getConfig();
-          
+
           const resultEntry: ChatEntry = {
             type: "assistant",
             content: `🛡️ **Guardrails Management**
 
-**System Status:** ${config.enabled ? '✅ Enabled' : '❌ Disabled'}
-**Enforcement:** ${config.enforceGuardrails ? '✅ Active' : '❌ Disabled'}
+**System Status:** ${config.enabled ? "✅ Enabled" : "❌ Disabled"}
+**Enforcement:** ${config.enforceGuardrails ? "✅ Active" : "❌ Disabled"}
 **Error Prompt:** ${config.onErrorPrompt}
 
 **Recent Incidents:** ${incidents.length}
-${incidents.slice(0, 3).map(i => `- ${i.title} (${i.impact} impact)`).join('\n')}
+${incidents
+  .slice(0, 3)
+  .map((i) => `- ${i.title} (${i.impact} impact)`)
+  .join("\n")}
 
 **Available Commands:**
 - \`/guardrails --check\` - Check current plans against guardrails
@@ -1446,7 +1490,6 @@ ${incidents.slice(0, 3).map(i => `- ${i.title} (${i.impact} impact)`).join('\n')
           };
           setChatHistory((prev) => [...prev, resultEntry]);
         }
-
       } catch (error: any) {
         const errorEntry: ChatEntry = {
           type: "assistant",
@@ -1522,6 +1565,7 @@ ${incidents.slice(0, 3).map(i => `- ${i.title} (${i.impact} impact)`).join('\n')
   };
 
   const processUserMessage = async (userInput: string) => {
+    // Simple non-streaming implementation for now
     const userEntry: ChatEntry = {
       type: "user",
       content: userInput,
@@ -1533,151 +1577,13 @@ ${incidents.slice(0, 3).map(i => `- ${i.title} (${i.impact} impact)`).join('\n')
     clearInput();
 
     try {
-      setIsStreaming(true);
-      let streamingEntry: ChatEntry | null = null;
-      let accumulatedContent = "";
-      let lastTokenCount = 0;
-      let pendingToolCalls: GrokToolCall[] | null = null;
-      let pendingToolResults: Array<{ toolCall: GrokToolCall; toolResult: ToolResult }> = [];
-      let lastUpdateTime = Date.now();
-
-      const flushUpdates = () => {
-        const now = Date.now();
-        if (now - lastUpdateTime < 150) return; // Throttle to ~6-7 FPS
-
-        // Update token count if changed
-        if (lastTokenCount !== 0) {
-          setTokenCount(lastTokenCount);
-        }
-
-        // Handle accumulated content
-        if (accumulatedContent) {
-          if (!streamingEntry) {
-            const newStreamingEntry = {
-              type: "assistant" as const,
-              content: accumulatedContent,
-              timestamp: new Date(),
-              isStreaming: true,
-            };
-            setChatHistory((prev) => [...prev, newStreamingEntry]);
-            streamingEntry = newStreamingEntry;
-          } else {
-            setChatHistory((prev) =>
-              prev.map((entry, idx) =>
-                idx === prev.length - 1 && entry.isStreaming
-                  ? { ...entry, content: entry.content + accumulatedContent }
-                  : entry
-              )
-            );
-          }
-          accumulatedContent = "";
-        }
-
-        // Handle pending tool calls
-        if (pendingToolCalls) {
-          setChatHistory((prev) =>
-            prev.map((entry) =>
-              entry.isStreaming
-                ? {
-                    ...entry,
-                    isStreaming: false,
-                    toolCalls: pendingToolCalls,
-                  }
-                : entry
-            )
-          );
-          streamingEntry = null;
-
-          // Add individual tool call entries
-          pendingToolCalls.forEach((toolCall) => {
-            const toolCallEntry: ChatEntry = {
-              type: "tool_call",
-              content: "Executing...",
-              timestamp: new Date(),
-              toolCall: toolCall,
-            };
-            setChatHistory((prev) => [...prev, toolCallEntry]);
-          });
-          pendingToolCalls = null;
-        }
-
-        // Handle pending tool results
-        if (pendingToolResults.length > 0) {
-          setChatHistory((prev) =>
-            prev.map((entry) => {
-              if (entry.isStreaming) {
-                return { ...entry, isStreaming: false };
-              }
-              // Update matching tool_call entries
-              const matchingResult = pendingToolResults.find(
-                (result) => entry.type === "tool_call" && entry.toolCall?.id === result.toolCall.id
-              );
-              if (matchingResult) {
-                return {
-                  ...entry,
-                  type: "tool_result",
-                  content: matchingResult.toolResult.success
-                    ? matchingResult.toolResult.output || "Success"
-                    : matchingResult.toolResult.error || "Error occurred",
-                  toolResult: matchingResult.toolResult,
-                };
-              }
-              return entry;
-            })
-          );
-          streamingEntry = null;
-          pendingToolResults = [];
-        }
-
-        lastUpdateTime = now;
-      };
-
-      for await (const chunk of agent.processUserMessageStream(userInput)) {
-        switch (chunk.type) {
-          case "content":
-            if (chunk.content) {
-              accumulatedContent += chunk.content;
-            }
-            break;
-
-          case "token_count":
-            if (chunk.tokenCount !== undefined) {
-              lastTokenCount = chunk.tokenCount;
-            }
-            break;
-
-          case "tool_calls":
-            if (chunk.toolCalls) {
-              pendingToolCalls = chunk.toolCalls;
-            }
-            break;
-
-          case "tool_result":
-            if (chunk.toolCall && chunk.toolResult) {
-              pendingToolResults.push({ toolCall: chunk.toolCall, toolResult: chunk.toolResult });
-            }
-            break;
-
-          case "done":
-            // Flush all remaining updates
-            flushUpdates();
-            break;
-        }
-
-        // Flush updates periodically
-        flushUpdates();
+      const entries = await agent.processUserMessage(userInput);
+      const assistantEntry = entries.find(
+        (entry) => entry.type === "assistant",
+      );
+      if (assistantEntry) {
+        setChatHistory((prev) => [...prev, assistantEntry]);
       }
-
-      // Final flush and cleanup
-      flushUpdates();
-      if (streamingEntry) {
-        setChatHistory((prev) =>
-          prev.map((entry) =>
-            entry.isStreaming ? { ...entry, isStreaming: false } : entry
-          )
-        );
-      }
-      setIsStreaming(false);
     } catch (error: any) {
       const errorEntry: ChatEntry = {
         type: "assistant",
@@ -1685,13 +1591,10 @@ ${incidents.slice(0, 3).map(i => `- ${i.title} (${i.impact} impact)`).join('\n')
         timestamp: new Date(),
       };
       setChatHistory((prev) => [...prev, errorEntry]);
-      setIsStreaming(false);
     }
 
     setIsProcessing(false);
-    processingStartTime.current = 0;
   };
-
 
   return {
     input,

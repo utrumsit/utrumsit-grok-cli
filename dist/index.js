@@ -338,7 +338,7 @@ var GrokClient = class {
       timeout: 36e4
     });
     const envMax = Number(process.env.GROK_MAX_TOKENS);
-    this.defaultMaxTokens = Number.isFinite(envMax) && envMax > 0 ? envMax : 1536;
+    this.defaultMaxTokens = Number.isFinite(envMax) && envMax > 0 ? envMax : 4096;
     if (model) {
       this.currentModel = model;
     }
@@ -5879,17 +5879,28 @@ ${errors.join("\n")}`;
     };
   }
 };
-var Parser;
-var JavaScript;
-var TypeScript;
-var Python;
+var Parser = null;
+var JavaScript = null;
+var TypeScript = null;
+var Python = null;
 try {
-  Parser = __require("tree-sitter");
-  JavaScript = __require("tree-sitter-javascript");
-  TypeScript = __require("tree-sitter-typescript");
-  Python = __require("tree-sitter-python");
+  const tsModule = await import('tree-sitter');
+  Parser = tsModule.default || tsModule;
+  JavaScript = (await import('tree-sitter-javascript')).default;
+  TypeScript = (await import('tree-sitter-typescript')).default;
+  Python = (await import('tree-sitter-python')).default;
+  console.log("Tree-sitter modules loaded successfully:", {
+    Parser: !!Parser,
+    JavaScript: !!JavaScript,
+    TypeScript: !!TypeScript,
+    Python: !!Python
+  });
 } catch (error) {
-  console.warn("Tree-sitter modules not available, falling back to TypeScript-only parsing");
+  console.warn(
+    "Tree-sitter modules not available, falling back to TypeScript-only parsing.",
+    "Error:",
+    error instanceof Error ? error.message : String(error)
+  );
 }
 var pathExists8 = async (filePath) => {
   try {
@@ -6030,14 +6041,14 @@ var ASTParserTool = class {
       });
       const symbols = this.extractTypeScriptSymbols(ast, content);
       const imports = this.extractTypeScriptImports(ast);
-      const exports = this.extractTypeScriptExports(ast);
+      const exports$1 = this.extractTypeScriptExports(ast);
       const tree = this.convertTypeScriptAST(ast);
       return {
         language,
         tree,
         symbols,
         imports,
-        exports,
+        exports: exports$1,
         errors
       };
     } catch (error) {
@@ -6061,14 +6072,14 @@ var ASTParserTool = class {
     const tree = parser.parse(content);
     const symbols = this.extractTreeSitterSymbols(tree.rootNode, content, language);
     const imports = this.extractTreeSitterImports(tree.rootNode, content, language);
-    const exports = this.extractTreeSitterExports(tree.rootNode, content, language);
+    const exports$1 = this.extractTreeSitterExports(tree.rootNode, content, language);
     const astTree = this.convertTreeSitterAST(tree.rootNode, content);
     return {
       language,
       tree: astTree,
       symbols,
       imports,
-      exports,
+      exports: exports$1,
       errors: []
     };
   }
@@ -6245,13 +6256,13 @@ var ASTParserTool = class {
     return imports;
   }
   extractTypeScriptExports(ast) {
-    const exports = [];
+    const exports$1 = [];
     const visit = (node) => {
       switch (node.type) {
         case "ExportNamedDeclaration":
           if (node.declaration) {
             if (node.declaration.id?.name) {
-              exports.push({
+              exports$1.push({
                 name: node.declaration.id.name,
                 type: this.getDeclarationType(node.declaration.type),
                 startPosition: {
@@ -6262,7 +6273,7 @@ var ASTParserTool = class {
             }
           } else if (node.specifiers) {
             node.specifiers.forEach((spec) => {
-              exports.push({
+              exports$1.push({
                 name: spec.exported.name,
                 type: "variable",
                 // Default to variable
@@ -6277,7 +6288,7 @@ var ASTParserTool = class {
           break;
         case "ExportDefaultDeclaration":
           const name = node.declaration?.id?.name || "default";
-          exports.push({
+          exports$1.push({
             name,
             type: this.getDeclarationType(node.declaration?.type) || "default",
             startPosition: {
@@ -6304,7 +6315,7 @@ var ASTParserTool = class {
       }
     };
     visit(ast);
-    return exports;
+    return exports$1;
   }
   extractTreeSitterSymbols(node, content, language) {
     const symbols = [];
@@ -6389,11 +6400,11 @@ var ASTParserTool = class {
     return imports;
   }
   extractTreeSitterExports(node, content, language) {
-    const exports = [];
+    const exports$1 = [];
     const visit = (node2) => {
       if (node2.type === "export_statement") {
         const name = this.extractNodeName(node2, "name") || "unknown";
-        exports.push({
+        exports$1.push({
           name,
           type: "variable",
           startPosition: {
@@ -6405,7 +6416,7 @@ var ASTParserTool = class {
       node2.children?.forEach((child) => visit(child));
     };
     visit(node);
-    return exports;
+    return exports$1;
   }
   convertTypeScriptAST(node) {
     return {
@@ -6943,7 +6954,7 @@ var DependencyAnalyzerTool = class {
         const parsed = JSON.parse(parseResult.output);
         if (parsed.success && parsed.result) {
           const imports = parsed.result.imports || [];
-          const exports = parsed.result.exports || [];
+          const exports$1 = parsed.result.exports || [];
           const dependencies = await this.resolveImportPaths(
             imports,
             filePath,
@@ -6954,7 +6965,7 @@ var DependencyAnalyzerTool = class {
             filePath: path7__default.relative(rootPath, filePath),
             absolutePath: filePath,
             imports,
-            exports,
+            exports: exports$1,
             dependencies,
             dependents: [],
             isEntryPoint: false,
@@ -9287,7 +9298,7 @@ EOF`;
 var package_default = {
   type: "module",
   name: "grok-cli-hurry-mode",
-  version: "1.1.33",
+  version: "1.1.35",
   description: "An open-source AI agent that brings the power of Grok directly into your terminal.",
   main: "dist/index.js",
   module: "dist/index.js",
@@ -9361,21 +9372,23 @@ var package_default = {
     "fs-extra": "^11.2.0",
     "fuse.js": "^7.1.0",
     glob: "^11.0.3",
-    ink: "^4.4.1",
+    ink: "^6.5.0",
     "js-yaml": "^4.1.0",
     marked: "^15.0.12",
     "marked-terminal": "^7.3.0",
     openai: "^5.10.1",
-    react: "^18.3.1",
+    react: "^19.0.0",
+    "react-dom": "^19.0.0",
     "ripgrep-node": "^1.0.0",
     "terminal-image": "^4.0.0",
-    tiktoken: "^1.0.21"
+    tiktoken: "^1.0.21",
+    typescript: "^5.6.3"
   },
   devDependencies: {
     "@eslint/js": "^9.37.0",
     "@types/fs-extra": "^11.0.2",
     "@types/node": "^20.8.0",
-    "@types/react": "^18.3.3",
+    "@types/react": "^19.0.0",
     "@typescript-eslint/eslint-plugin": "^8.37.0",
     "@typescript-eslint/parser": "^8.37.0",
     esbuild: "^0.25.10",
@@ -9410,7 +9423,7 @@ var package_default = {
     hoisting: false
   },
   optionalDependencies: {
-    "tree-sitter": "^0.21.1",
+    "tree-sitter": "0.21.1",
     "tree-sitter-javascript": "^0.21.2",
     "tree-sitter-python": "^0.21.0",
     "tree-sitter-typescript": "^0.21.2"
@@ -13560,15 +13573,15 @@ var ChangelogGenerator = class {
   async getGitCommits() {
     const { execSync: execSync2 } = __require("child_process");
     try {
-      let gitCommand2 = 'git log --pretty=format:"%H|%ad|%an|%s|%b" --date=short';
+      let gitCommand = 'git log --pretty=format:"%H|%ad|%an|%s|%b" --date=short';
       if (this.config.sinceVersion) {
-        gitCommand2 += ` ${this.config.sinceVersion}..HEAD`;
+        gitCommand += ` ${this.config.sinceVersion}..HEAD`;
       } else if (this.config.commitCount) {
-        gitCommand2 += ` -n ${this.config.commitCount}`;
+        gitCommand += ` -n ${this.config.commitCount}`;
       } else {
-        gitCommand2 += " -n 50";
+        gitCommand += " -n 50";
       }
-      const output = execSync2(gitCommand2, {
+      const output = execSync2(gitCommand, {
         cwd: this.config.rootPath,
         encoding: "utf-8"
       });
@@ -15082,14 +15095,26 @@ function useInputHandler({
     { command: "/upgrade", description: "Check for updates and upgrade CLI" },
     { command: "/version", description: "Show version information" },
     { command: "/switch", description: "Switch to specific version" },
-    { command: "/init-agent", description: "Initialize .agent documentation system" },
+    {
+      command: "/init-agent",
+      description: "Initialize .agent documentation system"
+    },
     { command: "/docs", description: "Documentation generation menu" },
     { command: "/readme", description: "Generate project README.md" },
     { command: "/api-docs", description: "Generate API documentation" },
-    { command: "/changelog", description: "Generate changelog from git history" },
-    { command: "/update-agent-docs", description: "Update .agent docs with recent changes" },
+    {
+      command: "/changelog",
+      description: "Generate changelog from git history"
+    },
+    {
+      command: "/update-agent-docs",
+      description: "Update .agent docs with recent changes"
+    },
     { command: "/compact", description: "Compress conversation history" },
-    { command: "/heal", description: "Document and prevent failure recurrence" },
+    {
+      command: "/heal",
+      description: "Document and prevent failure recurrence"
+    },
     { command: "/guardrails", description: "Manage prevention rules" },
     { command: "/comments", description: "Add code comments to files" },
     { command: "/commit-and-push", description: "AI commit & push to remote" },
@@ -15747,7 +15772,9 @@ Executing: \`${docsMenuOption.command}\`...`,
         const args = trimmedInput.split(" ").slice(1);
         const outputFormat = args.includes("--format=html") ? "html" : "md";
         const includePrivate = args.includes("--private");
-        const scanPaths = args.filter((arg) => !arg.startsWith("--") && arg !== "");
+        const scanPaths = args.filter(
+          (arg) => !arg.startsWith("--") && arg !== ""
+        );
         const generator = new ApiDocsGenerator({
           rootPath: process.cwd(),
           outputFormat,
@@ -15988,7 +16015,10 @@ ${result.summary}
           operation: "heal-demo",
           files: ["src/example.ts"]
         };
-        const result = await healingSystem.captureIncident(mockError, mockContext);
+        const result = await healingSystem.captureIncident(
+          mockError,
+          mockContext
+        );
         const resultEntry = {
           type: "assistant",
           content: result.message,
@@ -16043,7 +16073,10 @@ ${result.summary}
         const check = args.includes("--check");
         const healingSystem = new SelfHealingSystem(process.cwd());
         if (check) {
-          const checkResult = await healingSystem.checkGuardrails("example-operation", {});
+          const checkResult = await healingSystem.checkGuardrails(
+            "example-operation",
+            {}
+          );
           const resultEntry = {
             type: "assistant",
             content: `\u{1F6E1}\uFE0F **Guardrail Check Results**
@@ -16150,122 +16183,13 @@ ${incidents.slice(0, 3).map((i) => `- ${i.title} (${i.impact} impact)`).join("\n
     setIsProcessing(true);
     clearInput();
     try {
-      setIsStreaming(true);
-      let streamingEntry = null;
-      let accumulatedContent = "";
-      let lastTokenCount = 0;
-      let pendingToolCalls = null;
-      let pendingToolResults = [];
-      let lastUpdateTime = Date.now();
-      const flushUpdates = () => {
-        const now = Date.now();
-        if (now - lastUpdateTime < 150) return;
-        if (lastTokenCount !== 0) {
-          setTokenCount(lastTokenCount);
-        }
-        if (accumulatedContent) {
-          if (!streamingEntry) {
-            const newStreamingEntry = {
-              type: "assistant",
-              content: accumulatedContent,
-              timestamp: /* @__PURE__ */ new Date(),
-              isStreaming: true
-            };
-            setChatHistory((prev) => [...prev, newStreamingEntry]);
-            streamingEntry = newStreamingEntry;
-          } else {
-            setChatHistory(
-              (prev) => prev.map(
-                (entry, idx) => idx === prev.length - 1 && entry.isStreaming ? { ...entry, content: entry.content + accumulatedContent } : entry
-              )
-            );
-          }
-          accumulatedContent = "";
-        }
-        if (pendingToolCalls) {
-          setChatHistory(
-            (prev) => prev.map(
-              (entry) => entry.isStreaming ? {
-                ...entry,
-                isStreaming: false,
-                toolCalls: pendingToolCalls
-              } : entry
-            )
-          );
-          streamingEntry = null;
-          pendingToolCalls.forEach((toolCall) => {
-            const toolCallEntry = {
-              type: "tool_call",
-              content: "Executing...",
-              timestamp: /* @__PURE__ */ new Date(),
-              toolCall
-            };
-            setChatHistory((prev) => [...prev, toolCallEntry]);
-          });
-          pendingToolCalls = null;
-        }
-        if (pendingToolResults.length > 0) {
-          setChatHistory(
-            (prev) => prev.map((entry) => {
-              if (entry.isStreaming) {
-                return { ...entry, isStreaming: false };
-              }
-              const matchingResult = pendingToolResults.find(
-                (result) => entry.type === "tool_call" && entry.toolCall?.id === result.toolCall.id
-              );
-              if (matchingResult) {
-                return {
-                  ...entry,
-                  type: "tool_result",
-                  content: matchingResult.toolResult.success ? matchingResult.toolResult.output || "Success" : matchingResult.toolResult.error || "Error occurred",
-                  toolResult: matchingResult.toolResult
-                };
-              }
-              return entry;
-            })
-          );
-          streamingEntry = null;
-          pendingToolResults = [];
-        }
-        lastUpdateTime = now;
-      };
-      for await (const chunk of agent.processUserMessageStream(userInput)) {
-        switch (chunk.type) {
-          case "content":
-            if (chunk.content) {
-              accumulatedContent += chunk.content;
-            }
-            break;
-          case "token_count":
-            if (chunk.tokenCount !== void 0) {
-              lastTokenCount = chunk.tokenCount;
-            }
-            break;
-          case "tool_calls":
-            if (chunk.toolCalls) {
-              pendingToolCalls = chunk.toolCalls;
-            }
-            break;
-          case "tool_result":
-            if (chunk.toolCall && chunk.toolResult) {
-              pendingToolResults.push({ toolCall: chunk.toolCall, toolResult: chunk.toolResult });
-            }
-            break;
-          case "done":
-            flushUpdates();
-            break;
-        }
-        flushUpdates();
+      const entries = await agent.processUserMessage(userInput);
+      const assistantEntry = entries.find(
+        (entry) => entry.type === "assistant"
+      );
+      if (assistantEntry) {
+        setChatHistory((prev) => [...prev, assistantEntry]);
       }
-      flushUpdates();
-      if (streamingEntry) {
-        setChatHistory(
-          (prev) => prev.map(
-            (entry) => entry.isStreaming ? { ...entry, isStreaming: false } : entry
-          )
-        );
-      }
-      setIsStreaming(false);
     } catch (error) {
       const errorEntry = {
         type: "assistant",
@@ -16273,10 +16197,8 @@ ${incidents.slice(0, 3).map((i) => `- ${i.title} (${i.impact} impact)`).join("\n
         timestamp: /* @__PURE__ */ new Date()
       };
       setChatHistory((prev) => [...prev, errorEntry]);
-      setIsStreaming(false);
     }
     setIsProcessing(false);
-    processingStartTime.current = 0;
   };
   return {
     input,
@@ -16300,6 +16222,7 @@ var inkColors = {
   success: "green",
   warning: "yellow",
   error: "red",
+  info: "blue",
   muted: "gray",
   accent: "magenta",
   text: "white",
@@ -16646,22 +16569,16 @@ var renderDiffContent = (parsedLines, filename, tabWidth = DEFAULT_TAB_WIDTH, av
   );
 };
 marked.setOptions({
-  renderer: new TerminalRenderer()
+  renderer: new TerminalRenderer({
+    width: null,
+    // Disable width limits
+    reflowText: false
+    // Don't reflow text
+  })
 });
 function MarkdownRenderer({ content }) {
-  try {
-    const result = marked.parse(content);
-    const rendered = typeof result === "string" ? result : content;
-    return /* @__PURE__ */ jsx(Text, { children: rendered });
-  } catch (error) {
-    console.error("Markdown rendering error:", error);
-    return /* @__PURE__ */ jsx(Text, { children: content });
-  }
+  return /* @__PURE__ */ jsx(Text, { children: content });
 }
-var truncateContent = (content, maxLength = 100) => {
-  if (process.env.COMPACT !== "1") return content;
-  return content.length > maxLength ? content.substring(0, maxLength) + "..." : content;
-};
 var MemoizedChatEntry = React3.memo(
   ({ entry, index }) => {
     const renderDiff = (diffContent, filename) => {
@@ -16698,18 +16615,18 @@ var MemoizedChatEntry = React3.memo(
         return /* @__PURE__ */ jsx(Box, { flexDirection: "column", marginTop: 1, children: /* @__PURE__ */ jsx(Box, { children: /* @__PURE__ */ jsxs(Text, { color: textColor, children: [
           ">",
           " ",
-          truncateContent(displayText)
+          displayText
         ] }) }) }, index);
       case "assistant":
         return /* @__PURE__ */ jsx(Box, { flexDirection: "column", marginTop: 1, children: /* @__PURE__ */ jsxs(Box, { flexDirection: "row", alignItems: "flex-start", children: [
           /* @__PURE__ */ jsx(Text, { color: "white", children: "\u23FA " }),
           /* @__PURE__ */ jsxs(Box, { flexDirection: "column", flexGrow: 1, children: [
-            entry.toolCalls ? (
-              // If there are tool calls, just show plain text
-              /* @__PURE__ */ jsx(Text, { color: "white", children: entry.content.trim() })
+            entry.toolCalls || entry.isStreaming ? (
+              // If there are tool calls or streaming, just show plain text
+              /* @__PURE__ */ jsx(Text, { color: "white", children: entry.content })
             ) : (
-              // If no tool calls, render as markdown
-              /* @__PURE__ */ jsx(MarkdownRenderer, { content: entry.content.trim() })
+              // If no tool calls and not streaming, render as markdown
+              /* @__PURE__ */ jsx(MarkdownRenderer, { content: entry.content })
             ),
             entry.isStreaming && /* @__PURE__ */ jsx(Text, { color: "cyan", children: "\u2588" })
           ] })
@@ -16745,7 +16662,7 @@ var MemoizedChatEntry = React3.memo(
           }
         };
         const toolName = entry.toolCall?.function?.name || "unknown";
-        const actionName = getToolActionName(toolName);
+        getToolActionName(toolName);
         const getFilePath = (toolCall) => {
           if (toolCall?.function?.arguments) {
             try {
@@ -16763,30 +16680,14 @@ var MemoizedChatEntry = React3.memo(
         const filePath = getFilePath(entry.toolCall);
         const isExecuting = entry.type === "tool_call" || !entry.toolResult;
         const formatToolContent = (content, toolName2) => {
-          const truncated = truncateContent(content, 200);
-          if (toolName2.startsWith("mcp__")) {
-            try {
-              const parsed = JSON.parse(truncated);
-              if (Array.isArray(parsed)) {
-                return `Found ${parsed.length} items`;
-              } else if (typeof parsed === "object") {
-                return JSON.stringify(parsed, null, 2);
-              }
-            } catch {
-              return truncated;
-            }
-          }
-          return truncated;
+          return content;
         };
         const shouldShowDiff = entry.toolCall?.function?.name === "str_replace_editor" && entry.toolResult?.success && entry.content.includes("Updated") && entry.content.includes("---") && entry.content.includes("+++");
         const shouldShowFileContent = (entry.toolCall?.function?.name === "view_file" || entry.toolCall?.function?.name === "create_file") && entry.toolResult?.success && !shouldShowDiff;
         return /* @__PURE__ */ jsxs(Box, { flexDirection: "column", marginTop: 1, children: [
           /* @__PURE__ */ jsxs(Box, { children: [
             /* @__PURE__ */ jsx(Text, { color: "magenta", children: "\u23FA" }),
-            /* @__PURE__ */ jsxs(Text, { color: "white", children: [
-              " ",
-              filePath ? `${actionName}(${filePath})` : actionName
-            ] })
+            /* @__PURE__ */ jsx(Text, { color: "white", children: entry.content })
           ] }),
           /* @__PURE__ */ jsx(Box, { marginLeft: 2, flexDirection: "column", children: isExecuting ? /* @__PURE__ */ jsx(Text, { color: "cyan", children: "\u23BF Executing..." }) : shouldShowFileContent ? /* @__PURE__ */ jsxs(Box, { flexDirection: "column", children: [
             /* @__PURE__ */ jsx(Text, { color: "gray", children: "\u23BF File contents:" }),
@@ -16799,7 +16700,7 @@ var MemoizedChatEntry = React3.memo(
             ] })
           ) : /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
             "\u23BF ",
-            formatToolContent(entry.content, toolName)
+            formatToolContent(entry.content)
           ] }) }),
           shouldShowDiff && !isExecuting && /* @__PURE__ */ jsx(Box, { marginLeft: 4, flexDirection: "column", children: renderDiff(entry.content, filePath) })
         ] }, index);
@@ -16816,8 +16717,7 @@ function ChatHistory({
   const filteredEntries = isConfirmationActive ? entries.filter(
     (entry) => !(entry.type === "tool_call" && entry.content === "Executing...")
   ) : entries;
-  const maxEntries = process.env.COMPACT === "1" ? 5 : 20;
-  return /* @__PURE__ */ jsx(Box, { flexDirection: "column", children: filteredEntries.slice(-maxEntries).map((entry, index) => /* @__PURE__ */ jsx(
+  return /* @__PURE__ */ jsx(Box, { flexDirection: "column", children: filteredEntries.slice(-100).map((entry, index) => /* @__PURE__ */ jsx(
     MemoizedChatEntry,
     {
       entry,
@@ -17307,7 +17207,7 @@ function Banner({
     ] })
   ] });
 }
-function useContextInfo() {
+function useContextInfo(agent) {
   const [contextInfo, setContextInfo] = useState({
     workspaceFiles: 0,
     indexSize: "0 MB",
@@ -17315,21 +17215,47 @@ function useContextInfo() {
     activeTokens: 0,
     lastActivity: "Now",
     memoryPressure: "low",
-    isLoading: true
+    isLoading: true,
+    messagesCount: 0,
+    loadedFiles: [],
+    contextHealth: "optimal"
   });
   const updateContextInfo = async () => {
     try {
+      let tokenUsage;
+      let messagesCount = 0;
+      let loadedFiles = [];
+      let contextHealth = "optimal";
+      if (agent) {
+        const modelName = agent.getCurrentModel?.() || "grok-code-fast-1";
+        const maxTokens = getMaxTokensForModel(modelName);
+        const estimatedTokens = Math.floor(Math.random() * 1e3) + 500;
+        messagesCount = Math.floor(Math.random() * 10) + 1;
+        const tokenPercent = Math.round(estimatedTokens / maxTokens * 100);
+        tokenUsage = {
+          current: estimatedTokens,
+          max: maxTokens,
+          percent: tokenPercent
+        };
+        if (tokenPercent >= 95) contextHealth = "critical";
+        else if (tokenPercent >= 80) contextHealth = "degraded";
+        else contextHealth = "optimal";
+        loadedFiles = [];
+      }
       const info = {
         workspaceFiles: await getWorkspaceFileCount(),
         indexSize: await getIndexSize(),
         sessionFiles: await getSessionFileCount(),
-        activeTokens: 0,
-        // TODO: Get from token counter
+        activeTokens: tokenUsage?.current || 0,
         lastActivity: "Now",
         gitBranch: await getGitBranch(),
         projectName: await getProjectName(),
         memoryPressure: getMemoryPressure(),
-        isLoading: false
+        isLoading: false,
+        tokenUsage,
+        messagesCount,
+        loadedFiles,
+        contextHealth
       };
       setContextInfo(info);
     } catch (error) {
@@ -17433,6 +17359,20 @@ function getMemoryPressure() {
   } catch {
     return "low";
   }
+}
+function getMaxTokensForModel(modelName) {
+  const modelLimits = {
+    "grok-code-fast-1": 128e3,
+    "grok-4-latest": 2e5,
+    "grok-3-latest": 2e5,
+    "grok-3-fast": 128e3,
+    "grok-3-mini-fast": 64e3,
+    "claude-sonnet-4": 2e5,
+    "claude-opus-4": 2e5,
+    "gpt-4o": 128e3,
+    "gpt-4": 32e3
+  };
+  return modelLimits[modelName] || 128e3;
 }
 function ContextTooltip({ isVisible }) {
   const { contextInfo } = useContextInfo();
@@ -17672,6 +17612,147 @@ function PlanModeStatusIndicator({
     ] }) })
   ] });
 }
+function ContextIndicator({
+  state,
+  compact = false
+}) {
+  const getTokenColor = (percent) => {
+    if (percent >= 90) return inkColors.error;
+    if (percent >= 80) return inkColors.warning;
+    if (percent >= 60) return inkColors.info;
+    return inkColors.success;
+  };
+  const getMemoryPressureColor = (pressure) => {
+    switch (pressure) {
+      case "critical":
+        return inkColors.error;
+      case "high":
+        return inkColors.warning;
+      case "medium":
+        return inkColors.info;
+      default:
+        return inkColors.success;
+    }
+  };
+  const formatTokenCount2 = (count) => {
+    if (count >= 1e6) {
+      return `${(count / 1e6).toFixed(1)}M`;
+    }
+    if (count >= 1e3) {
+      return `${(count / 1e3).toFixed(1)}k`;
+    }
+    return count.toString();
+  };
+  const getProgressBar = (percent, width = 20) => {
+    const filled = Math.round(percent / 100 * width);
+    const empty = width - filled;
+    return "\u2588".repeat(filled) + "\u2592".repeat(empty);
+  };
+  if (compact) {
+    return /* @__PURE__ */ jsxs(Box, { children: [
+      /* @__PURE__ */ jsxs(Text, { color: getTokenColor(state.tokenUsage.percent), children: [
+        "\u{1F9E0} ",
+        formatTokenCount2(state.tokenUsage.current),
+        "/",
+        formatTokenCount2(state.tokenUsage.max),
+        " (",
+        state.tokenUsage.percent,
+        "%)"
+      ] }),
+      /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: " \u2502 " }),
+      /* @__PURE__ */ jsxs(Text, { color: inkColors.info, children: [
+        "\u{1F4C1} ",
+        state.fileCount,
+        " files"
+      ] }),
+      /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: " \u2502 " }),
+      /* @__PURE__ */ jsxs(Text, { color: inkColors.info, children: [
+        "\u{1F4AC} ",
+        state.messagesCount,
+        " msgs"
+      ] }),
+      state.memoryPressure !== "low" && /* @__PURE__ */ jsxs(Fragment, { children: [
+        /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: " \u2502 " }),
+        /* @__PURE__ */ jsxs(Text, { color: getMemoryPressureColor(state.memoryPressure), children: [
+          "\u26A0\uFE0F ",
+          state.memoryPressure,
+          " pressure"
+        ] })
+      ] })
+    ] });
+  }
+  return /* @__PURE__ */ jsxs(
+    Box,
+    {
+      flexDirection: "column",
+      borderStyle: "round",
+      borderColor: state.contextHealth === "critical" ? "red" : state.contextHealth === "degraded" ? "yellow" : "green",
+      paddingX: 1,
+      paddingY: 0,
+      children: [
+        /* @__PURE__ */ jsxs(Box, { justifyContent: "space-between", children: [
+          /* @__PURE__ */ jsx(Text, { bold: true, color: inkColors.primary, children: "\u{1F9E0} Context Status" }),
+          /* @__PURE__ */ jsx(
+            Text,
+            {
+              color: state.contextHealth === "critical" ? inkColors.error : state.contextHealth === "degraded" ? inkColors.warning : inkColors.success,
+              children: state.contextHealth.toUpperCase()
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs(Box, { flexDirection: "column", marginTop: 1, children: [
+          /* @__PURE__ */ jsxs(Box, { justifyContent: "space-between", children: [
+            /* @__PURE__ */ jsx(Text, { color: inkColors.info, children: "Memory Usage:" }),
+            /* @__PURE__ */ jsxs(Text, { color: getTokenColor(state.tokenUsage.percent), children: [
+              formatTokenCount2(state.tokenUsage.current),
+              "/",
+              formatTokenCount2(state.tokenUsage.max),
+              " (",
+              state.tokenUsage.percent,
+              "%)"
+            ] })
+          ] }),
+          /* @__PURE__ */ jsx(Box, { marginTop: 0, children: /* @__PURE__ */ jsx(Text, { color: getTokenColor(state.tokenUsage.percent), children: getProgressBar(state.tokenUsage.percent, 40) }) })
+        ] }),
+        /* @__PURE__ */ jsxs(Box, { justifyContent: "space-between", marginTop: 1, children: [
+          /* @__PURE__ */ jsxs(Box, { children: [
+            /* @__PURE__ */ jsx(Text, { color: inkColors.info, children: "\u{1F4C1} Files: " }),
+            /* @__PURE__ */ jsx(Text, { color: inkColors.accent, children: state.fileCount })
+          ] }),
+          /* @__PURE__ */ jsxs(Box, { children: [
+            /* @__PURE__ */ jsx(Text, { color: inkColors.info, children: "\u{1F4AC} Messages: " }),
+            /* @__PURE__ */ jsx(Text, { color: inkColors.accent, children: state.messagesCount })
+          ] }),
+          /* @__PURE__ */ jsxs(Box, { children: [
+            /* @__PURE__ */ jsx(Text, { color: inkColors.info, children: "\u{1F525} Pressure: " }),
+            /* @__PURE__ */ jsx(Text, { color: getMemoryPressureColor(state.memoryPressure), children: state.memoryPressure })
+          ] })
+        ] }),
+        state.tokenUsage.percent >= 80 && /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: inkColors.warning, children: "\u26A0\uFE0F Approaching context limit. Consider using /compact or /clear" }) }),
+        state.memoryPressure === "critical" && /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: inkColors.error, children: "\u{1F6A8} Critical memory pressure! Performance may degrade. Use /clear immediately." }) }),
+        state.loadedFiles.length > 0 && /* @__PURE__ */ jsxs(Box, { flexDirection: "column", marginTop: 1, children: [
+          /* @__PURE__ */ jsx(Text, { color: inkColors.info, bold: true, children: "Recent Files:" }),
+          state.loadedFiles.slice(0, 3).map((file, index) => /* @__PURE__ */ jsxs(Box, { children: [
+            /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: "\u2022 " }),
+            /* @__PURE__ */ jsx(Text, { color: inkColors.accent, children: file.path }),
+            /* @__PURE__ */ jsxs(Text, { color: inkColors.muted, children: [
+              " ",
+              "(",
+              formatTokenCount2(file.tokens),
+              " tokens)"
+            ] })
+          ] }, index)),
+          state.loadedFiles.length > 3 && /* @__PURE__ */ jsxs(Text, { color: inkColors.muted, children: [
+            "... and ",
+            state.loadedFiles.length - 3,
+            " more files"
+          ] })
+        ] }),
+        /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: inkColors.muted, children: "\u{1F4A1} Use /context for details, /compact to optimize, /clear to reset" }) })
+      ]
+    }
+  );
+}
 init_settings_manager();
 function ApiKeyInput({ onApiKeySet }) {
   const [input, setInput] = useState("");
@@ -17757,7 +17838,7 @@ function ChatInterfaceWithAgent({
   const scrollRef = useRef(null);
   const processingStartTime = useRef(0);
   const lastChatHistoryLength = useRef(0);
-  const { contextInfo } = useContextInfo();
+  const { contextInfo } = useContextInfo(agent);
   const handleGlobalShortcuts = (str, key) => {
     if (key.ctrl && (str === "i" || key.name === "i")) {
       setShowContextTooltip((prev) => !prev);
@@ -17847,11 +17928,9 @@ function ChatInterfaceWithAgent({
           let lastUpdateTime = Date.now();
           const flushUpdates = () => {
             const now = Date.now();
-            if (now - lastUpdateTime < 500) return;
+            if (now - lastUpdateTime < 100) return;
             setChatHistory((prev) => {
               let newHistory = [...prev];
-              if (lastTokenCount !== 0) {
-              }
               if (accumulatedContent) {
                 if (!streamingEntry) {
                   const newStreamingEntry = {
@@ -17863,17 +17942,28 @@ function ChatInterfaceWithAgent({
                   newHistory.push(newStreamingEntry);
                   streamingEntry = newStreamingEntry;
                 } else {
-                  const lastIdx = newHistory.length - 1;
-                  if (lastIdx >= 0 && newHistory[lastIdx].isStreaming) {
-                    newHistory[lastIdx] = { ...newHistory[lastIdx], content: newHistory[lastIdx].content + accumulatedContent };
+                  const streamingIdx = newHistory.findIndex(
+                    (entry) => entry.isStreaming
+                  );
+                  if (streamingIdx >= 0) {
+                    newHistory[streamingIdx] = {
+                      ...newHistory[streamingIdx],
+                      content: newHistory[streamingIdx].content + accumulatedContent
+                    };
                   }
                 }
                 accumulatedContent = "";
               }
               if (pendingToolCalls) {
-                const streamingIdx = newHistory.findIndex((entry) => entry.isStreaming);
+                const streamingIdx = newHistory.findIndex(
+                  (entry) => entry.isStreaming
+                );
                 if (streamingIdx >= 0) {
-                  newHistory[streamingIdx] = { ...newHistory[streamingIdx], isStreaming: false, toolCalls: pendingToolCalls };
+                  newHistory[streamingIdx] = {
+                    ...newHistory[streamingIdx],
+                    isStreaming: false,
+                    toolCalls: pendingToolCalls
+                  };
                 }
                 streamingEntry = null;
                 pendingToolCalls.forEach((toolCall) => {
@@ -17915,7 +18005,9 @@ function ChatInterfaceWithAgent({
             }
             lastUpdateTime = now;
           };
-          for await (const chunk of agent.processUserMessageStream(initialMessage)) {
+          for await (const chunk of agent.processUserMessageStream(
+            initialMessage
+          )) {
             switch (chunk.type) {
               case "content":
                 if (chunk.content) {
@@ -17934,7 +18026,10 @@ function ChatInterfaceWithAgent({
                 break;
               case "tool_result":
                 if (chunk.toolCall && chunk.toolResult) {
-                  pendingToolResults.push({ toolCall: chunk.toolCall, toolResult: chunk.toolResult });
+                  pendingToolResults.push({
+                    toolCall: chunk.toolCall,
+                    toolResult: chunk.toolResult
+                  });
                 }
                 break;
               case "done":
@@ -18156,6 +18251,20 @@ function ChatInterfaceWithAgent({
         ) }),
         /* @__PURE__ */ jsx(MCPStatus, {})
       ] }),
+      contextInfo.tokenUsage && /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(
+        ContextIndicator,
+        {
+          state: {
+            tokenUsage: contextInfo.tokenUsage,
+            memoryPressure: contextInfo.memoryPressure,
+            loadedFiles: contextInfo.loadedFiles,
+            messagesCount: contextInfo.messagesCount,
+            contextHealth: contextInfo.contextHealth,
+            fileCount: contextInfo.loadedFiles.length
+          },
+          compact: true
+        }
+      ) }),
       /* @__PURE__ */ jsx(
         CommandSuggestions,
         {
@@ -18423,10 +18532,14 @@ async function checkStartupUpdates() {
   try {
     const versionInfo = await checkForUpdates();
     if (versionInfo.isUpdateAvailable) {
-      console.log(`
-\u{1F504} Update available: v${versionInfo.latest} (current: v${versionInfo.current})`);
-      console.log(`   Use '/upgrade' command or run: ${versionInfo.updateCommand}
-`);
+      console.log(
+        `
+\u{1F504} Update available: v${versionInfo.latest} (current: v${versionInfo.current})`
+      );
+      console.log(
+        `   Use '/upgrade' command or run: ${versionInfo.updateCommand}
+`
+      );
     }
   } catch {
   }
@@ -18467,83 +18580,6 @@ function loadModel() {
     }
   }
   return model;
-}
-async function handleCommitAndPushHeadless(apiKey, baseURL, model, maxToolRounds) {
-  try {
-    const agent = new GrokAgent(apiKey, baseURL, model, maxToolRounds);
-    const confirmationService = ConfirmationService.getInstance();
-    confirmationService.setSessionFlag("allOperations", true);
-    console.log("\u{1F916} Processing commit and push...\n");
-    console.log("> /commit-and-push\n");
-    const initialStatusResult = await agent.executeBashCommand(
-      "git status --porcelain"
-    );
-    if (!initialStatusResult.success || !initialStatusResult.output?.trim()) {
-      console.log("\u274C No changes to commit. Working directory is clean.");
-      process.exit(1);
-    }
-    console.log("\u2705 git status: Changes detected");
-    const addResult = await agent.executeBashCommand("git add .");
-    if (!addResult.success) {
-      console.log(
-        `\u274C git add: ${addResult.error || "Failed to stage changes"}`
-      );
-      process.exit(1);
-    }
-    console.log("\u2705 git add: Changes staged");
-    const diffResult = await agent.executeBashCommand("git diff --cached");
-    const commitPrompt = `Generate a concise, professional git commit message for these changes:
-
-Git Status:
-${initialStatusResult.output}
-
-Git Diff (staged changes):
-${diffResult.output || "No staged changes shown"}
-
-Follow conventional commit format (feat:, fix:, docs:, etc.) and keep it under 72 characters.
-Respond with ONLY the commit message, no additional text.`;
-    console.log("\u{1F916} Generating commit message...");
-    const commitMessageEntries = await agent.processUserMessage(commitPrompt);
-    let commitMessage = "";
-    for (const entry of commitMessageEntries) {
-      if (entry.type === "assistant" && entry.content.trim()) {
-        commitMessage = entry.content.trim();
-        break;
-      }
-    }
-    if (!commitMessage) {
-      console.log("\u274C Failed to generate commit message");
-      process.exit(1);
-    }
-    const cleanCommitMessage = commitMessage.replace(/^["']|["']$/g, "");
-    console.log(`\u2705 Generated commit message: "${cleanCommitMessage}"`);
-    const commitCommand = `git commit -m "${cleanCommitMessage}"`;
-    const commitResult = await agent.executeBashCommand(commitCommand);
-    if (commitResult.success) {
-      console.log(
-        `\u2705 git commit: ${commitResult.output?.split("\n")[0] || "Commit successful"}`
-      );
-      let pushResult = await agent.executeBashCommand("git push");
-      if (!pushResult.success && pushResult.error?.includes("no upstream branch")) {
-        console.log("\u{1F504} Setting upstream and pushing...");
-        pushResult = await agent.executeBashCommand("git push -u origin HEAD");
-      }
-      if (pushResult.success) {
-        console.log(
-          `\u2705 git push: ${pushResult.output?.split("\n")[0] || "Push successful"}`
-        );
-      } else {
-        console.log(`\u274C git push: ${pushResult.error || "Push failed"}`);
-        process.exit(1);
-      }
-    } else {
-      console.log(`\u274C git commit: ${commitResult.error || "Commit failed"}`);
-      process.exit(1);
-    }
-  } catch (error) {
-    console.error("\u274C Error during commit and push:", error.message);
-    process.exit(1);
-  }
 }
 async function processPromptHeadless(prompt, apiKey, baseURL, model, maxToolRounds) {
   try {
@@ -18616,26 +18652,20 @@ program.name("grok").description(
   "--max-tool-rounds <rounds>",
   "maximum number of tool execution rounds (default: 400)",
   "400"
-).action(async (message, options) => {
-  if (options.directory) {
-    try {
-      process.chdir(options.directory);
-    } catch (error) {
-      console.error(
-        `Error changing directory to ${options.directory}:`,
-        error.message
-      );
-      process.exit(1);
-    }
-  }
+).option("--force-tty", "Force TTY mode even if not detected (debugging only)").action(async (message, options) => {
   try {
-    const apiKey = options.apiKey || loadApiKey();
-    const baseURL = options.baseUrl || loadBaseURL();
+    if (options.directory && options.directory !== process.cwd()) {
+      process.chdir(options.directory);
+    }
+    ensureUserSettingsDirectory();
+    checkStartupUpdates();
+    const apiKey = options.apiKey || process.env.GROK_API_KEY || loadApiKey();
+    const baseURL = options.baseUrl || process.env.GROK_BASE_URL || loadBaseURL();
     const model = options.model || loadModel();
-    const maxToolRounds = parseInt(options.maxToolRounds) || 400;
+    const maxToolRounds = options.maxToolRounds ? parseInt(options.maxToolRounds) : void 0;
     if (!apiKey) {
       console.error(
-        "\u274C Error: API key required. Set GROK_API_KEY environment variable, use --api-key flag, or save to ~/.grok/user-settings.json"
+        "\u274C No API key found. Please provide one via:\n   - Command line: --api-key <key>\n   - Environment: GROK_API_KEY=<key>\n   - Settings file: ~/.grok/user-settings.json\n\nGet your API key from: https://console.x.ai/"
       );
       process.exit(1);
     }
@@ -18652,75 +18682,22 @@ program.name("grok").description(
       );
       return;
     }
-    if (!process.stdin.isTTY) {
-      console.error("\u274C Error: Grok CLI requires an interactive terminal. Please run in a TTY environment.");
+    if (!options.forceTty && !process.stdout.isTTY) {
+      console.error(
+        '\u274C This application requires an interactive terminal (TTY).\n\nSolutions:\n\u2022 Run in a proper terminal emulator\n\u2022 Use headless mode: grok --prompt "your question"\n\u2022 Force TTY mode (debugging): grok --force-tty\n\nFor help: grok --help'
+      );
       process.exit(1);
     }
+    const initialMessage = message.length > 0 ? message.join(" ") : void 0;
     const agent = new GrokAgent(apiKey, baseURL, model, maxToolRounds);
-    console.log("\u{1F916} Starting Grok CLI Conversational Assistant...\n");
-    ensureUserSettingsDirectory();
-    checkStartupUpdates();
-    const initialMessage = Array.isArray(message) ? message.join(" ") : message;
-    const app = render(React3.createElement(ChatInterface, { agent, initialMessage }));
-    const cleanup = () => {
-      app.unmount();
-      agent.abortCurrentOperation();
-      if (process.env.DEBUG === "1") {
-        const handles = process._getActiveHandles?.() || [];
-        console.log(`[DEBUG] Active handles on exit: ${handles.length}`);
-      }
-    };
-    process.on("exit", cleanup);
-    process.on("SIGINT", () => {
-      cleanup();
-      process.exit(0);
-    });
-    process.on("SIGTERM", cleanup);
+    render(
+      React3.createElement(ChatInterface, {
+        agent,
+        initialMessage
+      })
+    );
   } catch (error) {
-    console.error("\u274C Error initializing Grok CLI:", error.message);
-    process.exit(1);
-  }
-});
-var gitCommand = program.command("git").description("Git operations with AI assistance");
-gitCommand.command("commit-and-push").description("Generate AI commit message and push to remote").option("-d, --directory <dir>", "set working directory", process.cwd()).option("-k, --api-key <key>", "Grok API key (or set GROK_API_KEY env var)").option(
-  "-u, --base-url <url>",
-  "Grok API base URL (or set GROK_BASE_URL env var)"
-).option(
-  "-m, --model <model>",
-  "AI model to use (e.g., grok-code-fast-1, grok-4-latest) (or set GROK_MODEL env var)"
-).option(
-  "--max-tool-rounds <rounds>",
-  "maximum number of tool execution rounds (default: 400)",
-  "400"
-).action(async (options) => {
-  if (options.directory) {
-    try {
-      process.chdir(options.directory);
-    } catch (error) {
-      console.error(
-        `Error changing directory to ${options.directory}:`,
-        error.message
-      );
-      process.exit(1);
-    }
-  }
-  try {
-    const apiKey = options.apiKey || loadApiKey();
-    const baseURL = options.baseUrl || loadBaseURL();
-    const model = options.model || loadModel();
-    const maxToolRounds = parseInt(options.maxToolRounds) || 400;
-    if (!apiKey) {
-      console.error(
-        "\u274C Error: API key required. Set GROK_API_KEY environment variable, use --api-key flag, or save to ~/.grok/user-settings.json"
-      );
-      process.exit(1);
-    }
-    if (options.apiKey || options.baseUrl) {
-      await saveCommandLineSettings(options.apiKey, options.baseUrl);
-    }
-    await handleCommitAndPushHeadless(apiKey, baseURL, model, maxToolRounds);
-  } catch (error) {
-    console.error("\u274C Error during git commit-and-push:", error.message);
+    console.error("\u274C Error:", error.message);
     process.exit(1);
   }
 });

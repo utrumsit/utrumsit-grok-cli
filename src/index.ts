@@ -57,8 +57,12 @@ async function checkStartupUpdates(): Promise<void> {
   try {
     const versionInfo = await checkForUpdates();
     if (versionInfo.isUpdateAvailable) {
-      console.log(`\n🔄 Update available: v${versionInfo.latest} (current: v${versionInfo.current})`);
-      console.log(`   Use '/upgrade' command or run: ${versionInfo.updateCommand}\n`);
+      console.log(
+        `\n🔄 Update available: v${versionInfo.latest} (current: v${versionInfo.current})`,
+      );
+      console.log(
+        `   Use '/upgrade' command or run: ${versionInfo.updateCommand}\n`,
+      );
     }
   } catch {
     // Silently ignore network errors during startup
@@ -80,7 +84,7 @@ function loadBaseURL(): string {
 // Save command line settings to user settings file
 async function saveCommandLineSettings(
   apiKey?: string,
-  baseURL?: string
+  baseURL?: string,
 ): Promise<void> {
   try {
     const manager = getSettingsManager();
@@ -97,7 +101,7 @@ async function saveCommandLineSettings(
   } catch (error) {
     console.warn(
       "⚠️ Could not save settings to file:",
-      error instanceof Error ? error.message : "Unknown error"
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }
@@ -120,134 +124,13 @@ function loadModel(): string | undefined {
   return model;
 }
 
-// Handle commit-and-push command in headless mode
-async function handleCommitAndPushHeadless(
-  apiKey: string,
-  baseURL?: string,
-  model?: string,
-  maxToolRounds?: number
-): Promise<void> {
-  try {
-    const agent = new GrokAgent(apiKey, baseURL, model, maxToolRounds);
-
-    // Configure confirmation service for headless mode (auto-approve all operations)
-    const confirmationService = ConfirmationService.getInstance();
-    confirmationService.setSessionFlag("allOperations", true);
-
-    console.log("🤖 Processing commit and push...\n");
-    console.log("> /commit-and-push\n");
-
-    // First check if there are any changes at all
-    const initialStatusResult = await agent.executeBashCommand(
-      "git status --porcelain"
-    );
-
-    if (!initialStatusResult.success || !initialStatusResult.output?.trim()) {
-      console.log("❌ No changes to commit. Working directory is clean.");
-      process.exit(1);
-    }
-
-    console.log("✅ git status: Changes detected");
-
-    // Add all changes
-    const addResult = await agent.executeBashCommand("git add .");
-
-    if (!addResult.success) {
-      console.log(
-        `❌ git add: ${addResult.error || "Failed to stage changes"}`
-      );
-      process.exit(1);
-    }
-
-    console.log("✅ git add: Changes staged");
-
-    // Get staged changes for commit message generation
-    const diffResult = await agent.executeBashCommand("git diff --cached");
-
-    // Generate commit message using AI
-    const commitPrompt = `Generate a concise, professional git commit message for these changes:
-
-Git Status:
-${initialStatusResult.output}
-
-Git Diff (staged changes):
-${diffResult.output || "No staged changes shown"}
-
-Follow conventional commit format (feat:, fix:, docs:, etc.) and keep it under 72 characters.
-Respond with ONLY the commit message, no additional text.`;
-
-    console.log("🤖 Generating commit message...");
-
-    const commitMessageEntries = await agent.processUserMessage(commitPrompt);
-    let commitMessage = "";
-
-    // Extract the commit message from the AI response
-    for (const entry of commitMessageEntries) {
-      if (entry.type === "assistant" && entry.content.trim()) {
-        commitMessage = entry.content.trim();
-        break;
-      }
-    }
-
-    if (!commitMessage) {
-      console.log("❌ Failed to generate commit message");
-      process.exit(1);
-    }
-
-    // Clean the commit message
-    const cleanCommitMessage = commitMessage.replace(/^["']|["']$/g, "");
-    console.log(`✅ Generated commit message: "${cleanCommitMessage}"`);
-
-    // Execute the commit
-    const commitCommand = `git commit -m "${cleanCommitMessage}"`;
-    const commitResult = await agent.executeBashCommand(commitCommand);
-
-    if (commitResult.success) {
-      console.log(
-        `✅ git commit: ${
-          commitResult.output?.split("\n")[0] || "Commit successful"
-        }`
-      );
-
-      // If commit was successful, push to remote
-      // First try regular push, if it fails try with upstream setup
-      let pushResult = await agent.executeBashCommand("git push");
-
-      if (
-        !pushResult.success &&
-        pushResult.error?.includes("no upstream branch")
-      ) {
-        console.log("🔄 Setting upstream and pushing...");
-        pushResult = await agent.executeBashCommand("git push -u origin HEAD");
-      }
-
-      if (pushResult.success) {
-        console.log(
-          `✅ git push: ${
-            pushResult.output?.split("\n")[0] || "Push successful"
-          }`
-        );
-      } else {
-        console.log(`❌ git push: ${pushResult.error || "Push failed"}`);
-        process.exit(1);
-      }
-    } else {
-      console.log(`❌ git commit: ${commitResult.error || "Commit failed"}`);
-      process.exit(1);
-    }
-  } catch (error: any) {
-    console.error("❌ Error during commit and push:", error.message);
-    process.exit(1);
-  }
-}
-
 // Headless mode processing function
 async function processPromptHeadless(
   prompt: string,
   apiKey: string,
   baseURL?: string,
   model?: string,
-  maxToolRounds?: number
+  maxToolRounds?: number,
 ): Promise<void> {
   try {
     const agent = new GrokAgent(apiKey, baseURL, model, maxToolRounds);
@@ -314,16 +197,17 @@ async function processPromptHeadless(
       JSON.stringify({
         role: "assistant",
         content: `Error: ${error.message}`,
-      })
+      }),
     );
     process.exit(1);
   }
 }
 
+// Main program definition
 program
   .name("grok")
   .description(
-    "A conversational AI CLI tool powered by Grok with text editor capabilities"
+    "A conversational AI CLI tool powered by Grok with text editor capabilities",
   )
   .version(pkg.version)
   .argument("[message...]", "Initial message to send to Grok")
@@ -331,44 +215,52 @@ program
   .option("-k, --api-key <key>", "Grok API key (or set GROK_API_KEY env var)")
   .option(
     "-u, --base-url <url>",
-    "Grok API base URL (or set GROK_BASE_URL env var)"
+    "Grok API base URL (or set GROK_BASE_URL env var)",
   )
   .option(
     "-m, --model <model>",
-    "AI model to use (e.g., grok-code-fast-1, grok-4-latest) (or set GROK_MODEL env var)"
+    "AI model to use (e.g., grok-code-fast-1, grok-4-latest) (or set GROK_MODEL env var)",
   )
   .option(
     "-p, --prompt <prompt>",
-    "process a single prompt and exit (headless mode)"
+    "process a single prompt and exit (headless mode)",
   )
   .option(
     "--max-tool-rounds <rounds>",
     "maximum number of tool execution rounds (default: 400)",
-    "400"
+    "400",
   )
+  .option("--force-tty", "Force TTY mode even if not detected (debugging only)")
   .action(async (message, options) => {
-    if (options.directory) {
-      try {
-        process.chdir(options.directory);
-      } catch (error: any) {
-        console.error(
-          `Error changing directory to ${options.directory}:`,
-          error.message
-        );
-        process.exit(1);
-      }
-    }
-
     try {
-      // Get API key from options, environment, or user settings
-      const apiKey = options.apiKey || loadApiKey();
-      const baseURL = options.baseUrl || loadBaseURL();
-      const model = options.model || loadModel();
-      const maxToolRounds = parseInt(options.maxToolRounds) || 400;
+      // Change to specified directory if provided
+      if (options.directory && options.directory !== process.cwd()) {
+        process.chdir(options.directory);
+      }
 
+      // Ensure user settings directory exists
+      ensureUserSettingsDirectory();
+
+      // Check for updates in background
+      checkStartupUpdates();
+
+      // Load configuration
+      const apiKey = options.apiKey || process.env.GROK_API_KEY || loadApiKey();
+      const baseURL =
+        options.baseUrl || process.env.GROK_BASE_URL || loadBaseURL();
+      const model = options.model || loadModel();
+      const maxToolRounds = options.maxToolRounds
+        ? parseInt(options.maxToolRounds)
+        : undefined;
+
+      // Validate API key
       if (!apiKey) {
         console.error(
-          "❌ Error: API key required. Set GROK_API_KEY environment variable, use --api-key flag, or save to ~/.grok/user-settings.json"
+          "❌ No API key found. Please provide one via:\n" +
+            "   - Command line: --api-key <key>\n" +
+            "   - Environment: GROK_API_KEY=<key>\n" +
+            "   - Settings file: ~/.grok/user-settings.json\n\n" +
+            "Get your API key from: https://console.x.ai/",
         );
         process.exit(1);
       }
@@ -378,124 +270,51 @@ program
         await saveCommandLineSettings(options.apiKey, options.baseUrl);
       }
 
-      // Headless mode: process prompt and exit
+      // Check if we're in headless mode
       if (options.prompt) {
         await processPromptHeadless(
           options.prompt,
           apiKey,
           baseURL,
           model,
-          maxToolRounds
+          maxToolRounds,
         );
         return;
       }
 
-      // Interactive mode: launch UI
-      if (!process.stdin.isTTY) {
-        console.error("❌ Error: Grok CLI requires an interactive terminal. Please run in a TTY environment.");
+      // Check for TTY requirement (unless forced)
+      if (!options.forceTty && !process.stdout.isTTY) {
+        console.error(
+          "❌ This application requires an interactive terminal (TTY).\n\n" +
+            "Solutions:\n" +
+            "• Run in a proper terminal emulator\n" +
+            '• Use headless mode: grok --prompt "your question"\n' +
+            "• Force TTY mode (debugging): grok --force-tty\n\n" +
+            "For help: grok --help",
+        );
         process.exit(1);
       }
 
+      // Initialize the chat interface
+      const initialMessage = message.length > 0 ? message.join(" ") : undefined;
+
+      // Create the agent
       const agent = new GrokAgent(apiKey, baseURL, model, maxToolRounds);
-      console.log("🤖 Starting Grok CLI Conversational Assistant...\n");
 
-      ensureUserSettingsDirectory();
-      
-      // Check for updates (non-blocking)
-      checkStartupUpdates();
-
-      // Support variadic positional arguments for multi-word initial message
-      const initialMessage = Array.isArray(message)
-        ? message.join(" ")
-        : message;
-
-      const app = render(React.createElement(ChatInterface, { agent, initialMessage }));
-
-      // Cleanup on exit
-      const cleanup = () => {
-        app.unmount();
-        agent.abortCurrentOperation();
-        if (process.env.DEBUG === '1') {
-          const handles = (process as any)._getActiveHandles?.() || [];
-          console.log(`[DEBUG] Active handles on exit: ${handles.length}`);
-        }
-      };
-
-      process.on('exit', cleanup);
-      process.on('SIGINT', () => {
-        cleanup();
-        process.exit(0);
-      });
-      process.on('SIGTERM', cleanup);
+      render(
+        React.createElement(ChatInterface, {
+          agent,
+          initialMessage,
+        }),
+      );
     } catch (error: any) {
-      console.error("❌ Error initializing Grok CLI:", error.message);
+      console.error("❌ Error:", error.message);
       process.exit(1);
     }
   });
 
-// Git subcommand
-const gitCommand = program
-  .command("git")
-  .description("Git operations with AI assistance");
-
-gitCommand
-  .command("commit-and-push")
-  .description("Generate AI commit message and push to remote")
-  .option("-d, --directory <dir>", "set working directory", process.cwd())
-  .option("-k, --api-key <key>", "Grok API key (or set GROK_API_KEY env var)")
-  .option(
-    "-u, --base-url <url>",
-    "Grok API base URL (or set GROK_BASE_URL env var)"
-  )
-  .option(
-    "-m, --model <model>",
-    "AI model to use (e.g., grok-code-fast-1, grok-4-latest) (or set GROK_MODEL env var)"
-  )
-  .option(
-    "--max-tool-rounds <rounds>",
-    "maximum number of tool execution rounds (default: 400)",
-    "400"
-  )
-  .action(async (options) => {
-    if (options.directory) {
-      try {
-        process.chdir(options.directory);
-      } catch (error: any) {
-        console.error(
-          `Error changing directory to ${options.directory}:`,
-          error.message
-        );
-        process.exit(1);
-      }
-    }
-
-    try {
-      // Get API key from options, environment, or user settings
-      const apiKey = options.apiKey || loadApiKey();
-      const baseURL = options.baseUrl || loadBaseURL();
-      const model = options.model || loadModel();
-      const maxToolRounds = parseInt(options.maxToolRounds) || 400;
-
-      if (!apiKey) {
-        console.error(
-          "❌ Error: API key required. Set GROK_API_KEY environment variable, use --api-key flag, or save to ~/.grok/user-settings.json"
-        );
-        process.exit(1);
-      }
-
-      // Save API key and base URL to user settings if provided via command line
-      if (options.apiKey || options.baseUrl) {
-        await saveCommandLineSettings(options.apiKey, options.baseUrl);
-      }
-
-      await handleCommitAndPushHeadless(apiKey, baseURL, model, maxToolRounds);
-    } catch (error: any) {
-      console.error("❌ Error during git commit-and-push:", error.message);
-      process.exit(1);
-    }
-  });
-
-// MCP command
+// Add MCP command
 program.addCommand(createMCPCommand());
 
+// Parse command line arguments
 program.parse();

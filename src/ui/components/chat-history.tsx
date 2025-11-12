@@ -10,9 +10,9 @@ interface ChatHistoryProps {
 }
 
 // Helper to truncate content in compact mode
-const truncateContent = (content: string, maxLength: number = 100): string => {
-  if (process.env.COMPACT !== '1') return content;
-  return content.length > maxLength ? content.substring(0, maxLength) + '...' : content;
+// Removed truncation to fix output display
+const truncateContent = (content: string): string => {
+  return content; // No truncation - show full content
 };
 
 // Memoized ChatEntry component to prevent unnecessary re-renders
@@ -55,14 +55,16 @@ const MemoizedChatEntry = React.memo(
 
     switch (entry.type) {
       case "user":
-        const displayText = entry.isPasteSummary ? entry.displayContent || entry.content : entry.content;
+        const displayText = entry.isPasteSummary
+          ? entry.displayContent || entry.content
+          : entry.content;
         const textColor = entry.isPasteSummary ? "cyan" : "gray";
-        
+
         return (
           <Box key={index} flexDirection="column" marginTop={1}>
             <Box>
               <Text color={textColor}>
-                {">"} {truncateContent(displayText)}
+                {">"} {displayText}
               </Text>
             </Box>
           </Box>
@@ -74,12 +76,12 @@ const MemoizedChatEntry = React.memo(
             <Box flexDirection="row" alignItems="flex-start">
               <Text color="white">⏺ </Text>
               <Box flexDirection="column" flexGrow={1}>
-                {entry.toolCalls ? (
-                  // If there are tool calls, just show plain text
-                  <Text color="white">{entry.content.trim()}</Text>
+                {entry.toolCalls || entry.isStreaming ? (
+                  // If there are tool calls or streaming, just show plain text
+                  <Text color="white">{entry.content}</Text>
                 ) : (
-                  // If no tool calls, render as markdown
-                  <MarkdownRenderer content={entry.content.trim()} />
+                  // If no tool calls and not streaming, render as markdown
+                  <MarkdownRenderer content={entry.content} />
                 )}
                 {entry.isStreaming && <Text color="cyan">█</Text>}
               </Box>
@@ -140,27 +142,10 @@ const MemoizedChatEntry = React.memo(
 
         const filePath = getFilePath(entry.toolCall);
         const isExecuting = entry.type === "tool_call" || !entry.toolResult;
-        
+
         // Format JSON content for better readability
         const formatToolContent = (content: string, toolName: string) => {
-          const truncated = truncateContent(content, 200); // Allow longer for tools
-          if (toolName.startsWith("mcp__")) {
-            try {
-              // Try to parse as JSON and format it
-              const parsed = JSON.parse(truncated);
-              if (Array.isArray(parsed)) {
-                // For arrays, show a summary instead of full JSON
-                return `Found ${parsed.length} items`;
-              } else if (typeof parsed === 'object') {
-                // For objects, show a formatted version
-                return JSON.stringify(parsed, null, 2);
-              }
-            } catch {
-              // If not JSON, return as is
-              return truncated;
-            }
-          }
-          return truncated;
+          return content; // Show full tool output without truncation
         };
         const shouldShowDiff =
           entry.toolCall?.function?.name === "str_replace_editor" &&
@@ -179,10 +164,7 @@ const MemoizedChatEntry = React.memo(
           <Box key={index} flexDirection="column" marginTop={1}>
             <Box>
               <Text color="magenta">⏺</Text>
-              <Text color="white">
-                {" "}
-                {filePath ? `${actionName}(${filePath})` : actionName}
-              </Text>
+              <Text color="white">{entry.content}</Text>
             </Box>
             <Box marginLeft={2} flexDirection="column">
               {isExecuting ? (
@@ -198,7 +180,9 @@ const MemoizedChatEntry = React.memo(
                 // For diff results, show only the summary line, not the raw content
                 <Text color="gray">⎿ {entry.content.split("\n")[0]}</Text>
               ) : (
-                <Text color="gray">⎿ {formatToolContent(entry.content, toolName)}</Text>
+                <Text color="gray">
+                  ⎿ {formatToolContent(entry.content, toolName)}
+                </Text>
               )}
             </Box>
             {shouldShowDiff && !isExecuting && (
@@ -212,7 +196,7 @@ const MemoizedChatEntry = React.memo(
       default:
         return null;
     }
-  }
+  },
 );
 
 MemoizedChatEntry.displayName = "MemoizedChatEntry";
@@ -225,12 +209,12 @@ export function ChatHistory({
   const filteredEntries = isConfirmationActive
     ? entries.filter(
         (entry) =>
-          !(entry.type === "tool_call" && entry.content === "Executing...")
+          !(entry.type === "tool_call" && entry.content === "Executing..."),
       )
     : entries;
 
   // Compact mode: show fewer entries to reduce rendering overhead
-  const maxEntries = process.env.COMPACT === '1' ? 5 : 20;
+  const maxEntries = 100; // Even larger history buffer to prevent truncation
 
   return (
     <Box flexDirection="column">
