@@ -99,17 +99,16 @@ export function ChatInput({
       borderColor={borderColor}
       paddingX={1}
       paddingY={0}
-      marginTop={1}
     >
       <Box>
-        <Text color={promptColor}>❯ </Text>
+        <Text color={promptColor} bold>❯ </Text>
         {isPlaceholder ? (
           <>
             <Text color="gray" dimColor>
               {placeholderText}
             </Text>
             {showCursor && (
-              <Text backgroundColor="white" color="black">
+              <Text backgroundColor="cyan" color="black">
                 {" "}
               </Text>
             )}
@@ -118,7 +117,7 @@ export function ChatInput({
           <Text>
             {beforeCursor}
             {showCursor && (
-              <Text backgroundColor="white" color="black">
+              <Text backgroundColor="cyan" color="black">
                 {cursorChar}
               </Text>
             )}

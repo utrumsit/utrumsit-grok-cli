@@ -1,6 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
-import { DiffRenderer } from "./diff-renderer.js";
 
 interface ConfirmationDialogProps {
   operation: string;
@@ -11,7 +10,7 @@ interface ConfirmationDialogProps {
   content?: string; // Optional content to show (file content or command)
 }
 
-export default function ConfirmationDialog({
+const ConfirmationDialog = React.memo(function ConfirmationDialog({
   operation,
   filename,
   onConfirm,
@@ -23,12 +22,15 @@ export default function ConfirmationDialog({
   const [feedbackMode, setFeedbackMode] = useState(false);
   const [feedback, setFeedback] = useState("");
 
-  const options = [
-    "Yes",
-    "Yes, and don't ask again this session",
-    "No",
-    "No, with feedback",
-  ];
+  const options = useMemo(
+    () => [
+      "Yes",
+      "Yes, and don't ask again this session",
+      "No",
+      "No, with feedback",
+    ],
+    []
+  );
 
   useInput((input, key) => {
     if (feedbackMode) {
@@ -107,9 +109,9 @@ export default function ConfirmationDialog({
   }
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" paddingX={1} borderStyle="round" borderColor="yellow">
       {/* Tool use header - styled like chat history */}
-      <Box marginTop={1}>
+      <Box marginTop={0}>
         <Box>
           <Text color="magenta">⏺</Text>
           <Text color="white">
@@ -120,7 +122,7 @@ export default function ConfirmationDialog({
       </Box>
 
       <Box marginLeft={2} flexDirection="column">
-        <Text color="gray">⎿ Requesting user confirmation</Text>
+        <Text color="yellow" bold>⎿ Requesting user confirmation</Text>
 
         {showVSCodeOpen && (
           <Box marginTop={1}>
@@ -128,25 +130,21 @@ export default function ConfirmationDialog({
           </Box>
         )}
 
-        {/* Show content preview if provided */}
+        {/* Show minimal content preview - memoized to prevent re-renders */}
         {content && (
-          <>
-            <Text color="gray">⎿ {content.split('\n')[0]}</Text>
-            <Box marginLeft={4} flexDirection="column">
-              <DiffRenderer
-                diffContent={content}
-                filename={filename}
-                terminalWidth={80}
-              />
-            </Box>
-          </>
+          <Box marginTop={1} flexDirection="column">
+            <Text color="gray" dimColor>
+              Preview: {content.substring(0, 100)}
+              {content.length > 100 && "..."}
+            </Text>
+          </Box>
         )}
       </Box>
 
       {/* Confirmation options */}
       <Box flexDirection="column" marginTop={1}>
         <Box marginBottom={1}>
-          <Text>Do you want to proceed with this operation?</Text>
+          <Text bold>Do you want to proceed with this operation?</Text>
         </Box>
 
         <Box flexDirection="column">
@@ -155,6 +153,7 @@ export default function ConfirmationDialog({
               <Text
                 color={selectedOption === index ? "black" : "white"}
                 backgroundColor={selectedOption === index ? "cyan" : undefined}
+                bold={selectedOption === index}
               >
                 {index + 1}. {option}
               </Text>
@@ -170,4 +169,6 @@ export default function ConfirmationDialog({
       </Box>
     </Box>
   );
-}
+});
+
+export default ConfirmationDialog;

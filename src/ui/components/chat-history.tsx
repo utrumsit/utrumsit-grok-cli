@@ -58,32 +58,35 @@ const MemoizedChatEntry = React.memo(
         const displayText = entry.isPasteSummary
           ? entry.displayContent || entry.content
           : entry.content;
-        const textColor = entry.isPasteSummary ? "cyan" : "gray";
+        const textColor = entry.isPasteSummary ? "cyan" : "white";
 
         return (
-          <Box key={index} flexDirection="column" marginTop={1}>
-            <Box>
-              <Text color={textColor}>
-                {">"} {displayText}
-              </Text>
+          <Box key={index} flexDirection="column" marginTop={1} marginBottom={1}>
+            <Box paddingX={1} borderStyle="round" borderColor="blue" paddingY={0}>
+              <Box>
+                <Text color="blue" bold>❯ </Text>
+                <Text color={textColor}>{displayText}</Text>
+              </Box>
             </Box>
           </Box>
         );
 
       case "assistant":
         return (
-          <Box key={index} flexDirection="column" marginTop={1}>
-            <Box flexDirection="row" alignItems="flex-start">
-              <Text color="white">⏺ </Text>
-              <Box flexDirection="column" flexGrow={1}>
-                {entry.toolCalls || entry.isStreaming ? (
-                  // If there are tool calls or streaming, just show plain text
-                  <Text color="white">{entry.content}</Text>
-                ) : (
-                  // If no tool calls and not streaming, render as markdown
-                  <MarkdownRenderer content={entry.content} />
-                )}
-                {entry.isStreaming && <Text color="cyan">█</Text>}
+          <Box key={index} flexDirection="column" marginTop={1} marginBottom={1}>
+            <Box paddingX={1} borderStyle="round" borderColor="green" paddingY={0}>
+              <Box flexDirection="row" alignItems="flex-start">
+                <Text color="green" bold>✓ </Text>
+                <Box flexDirection="column" flexGrow={1}>
+                  {entry.toolCalls || entry.isStreaming ? (
+                    // If there are tool calls or streaming, just show plain text
+                    <Text color="white">{entry.content}</Text>
+                  ) : (
+                    // If no tool calls and not streaming, render as markdown
+                    <MarkdownRenderer content={entry.content} />
+                  )}
+                  {entry.isStreaming && <Text color="cyan" bold>█</Text>}
+                </Box>
               </Box>
             </Box>
           </Box>

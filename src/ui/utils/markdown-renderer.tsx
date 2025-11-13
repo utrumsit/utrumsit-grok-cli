@@ -12,6 +12,12 @@ marked.setOptions({
 });
 
 export function MarkdownRenderer({ content }: { content: string }) {
-  // Temporarily disable markdown rendering to debug truncation issues
-  return <Text>{content}</Text>;
+  try {
+    // Parse markdown and render it
+    const rendered = marked(content);
+    return <Text>{rendered}</Text>;
+  } catch (error) {
+    // Fallback to plain text if markdown parsing fails
+    return <Text>{content}</Text>;
+  }
 }

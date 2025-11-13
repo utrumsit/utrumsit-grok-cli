@@ -5,8 +5,8 @@ import * as path7 from 'path';
 import path7__default from 'path';
 import * as os from 'os';
 import os__default from 'os';
-import React3, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { Box, Text, render, useApp, useInput } from 'ink';
+import React3, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { Box, Text, useInput, render, useApp } from 'ink';
 import { program, Command } from 'commander';
 import * as dotenv from 'dotenv';
 import OpenAI from 'openai';
@@ -8703,10 +8703,12 @@ If a user rejects an operation, the tool will return an error and you should not
 Be helpful, direct, and efficient. Always explain what you're doing and show the results.
 
 IMPORTANT RESPONSE GUIDELINES:
-- After using tools, do NOT respond with pleasantries like "Thanks for..." or "Great!"
-- Only provide necessary explanations or next steps if relevant to the task
-- Keep responses concise and focused on the actual work being done
-- If a tool execution completes the user's request, you can remain silent or give a brief confirmation
+- After using tools, ALWAYS provide a brief summary of what was accomplished
+- Example: "Created eric.py with the requested code" or "Updated config.json with new settings"
+- Do NOT use generic messages like "Using tools to help you..."
+- Do NOT respond with pleasantries like "Thanks for..." or "Great!"
+- Keep responses concise and focused on the actual work being done (1-2 sentences max)
+- Your final message should clearly state what action was completed
 
 Current working directory: ${process.cwd()}`
     });
@@ -8782,9 +8784,36 @@ Current working directory: ${process.cwd()}`
         }
         if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
           toolRounds++;
+          let assistantContent = assistantMessage.content?.trim();
+          if (!assistantContent && assistantMessage.tool_calls?.length > 0) {
+            const toolSummaries = assistantMessage.tool_calls.map((tc) => {
+              try {
+                const args = JSON.parse(tc.function.arguments);
+                const fileName = args.path || args.file_path;
+                const baseName = fileName ? fileName.split("/").pop() : "";
+                switch (tc.function.name) {
+                  case "create_file":
+                    return baseName ? `Creating ${baseName}` : "Creating file";
+                  case "str_replace_editor":
+                    return baseName ? `Updating ${baseName}` : "Updating file";
+                  case "view_file":
+                    return baseName ? `Reading ${baseName}` : "Reading file";
+                  case "bash":
+                    return "Running command";
+                  default:
+                    return tc.function.name.replace(/_/g, " ");
+                }
+              } catch {
+                return tc.function.name.replace(/_/g, " ");
+              }
+            });
+            assistantContent = toolSummaries.join(", ") + "...";
+          } else if (!assistantContent) {
+            assistantContent = "Working on it...";
+          }
           const assistantEntry = {
             type: "assistant",
-            content: assistantMessage.content || "Using tools to help you...",
+            content: assistantContent,
             timestamp: /* @__PURE__ */ new Date(),
             toolCalls: assistantMessage.tool_calls
           };
@@ -8839,9 +8868,50 @@ Current working directory: ${process.cwd()}`
             this.isGrokModel() && this.shouldUseSearchFor(message) ? { search_parameters: { mode: "auto" } } : { search_parameters: { mode: "off" } }
           );
         } else {
+          let finalContent = assistantMessage.content?.trim();
+          if (!finalContent && toolRounds > 0) {
+            const lastAssistantWithTools = newEntries.reverse().find(
+              (e) => e.type === "assistant" && e.toolCalls
+            );
+            if (lastAssistantWithTools?.toolCalls) {
+              const toolSummaries = lastAssistantWithTools.toolCalls.map((tc) => {
+                try {
+                  const args = JSON.parse(tc.function.arguments);
+                  const fileName = args.path || args.file_path;
+                  const baseName = fileName ? fileName.split("/").pop() : "";
+                  switch (tc.function.name) {
+                    case "create_file":
+                      return baseName ? `Created ${baseName}` : "Created file";
+                    case "str_replace_editor":
+                      return baseName ? `Updated ${baseName}` : "Updated file";
+                    case "view_file":
+                      return baseName ? `Read ${baseName}` : "Read file";
+                    case "bash":
+                      return "Ran command";
+                    default:
+                      return "Completed " + tc.function.name.replace(/_/g, " ");
+                  }
+                } catch {
+                  return "Completed " + tc.function.name.replace(/_/g, " ");
+                }
+              });
+              if (toolSummaries.length === 1) {
+                finalContent = `\u2713 ${toolSummaries[0]}`;
+              } else if (toolSummaries.length === 2) {
+                finalContent = `\u2713 ${toolSummaries[0]} and ${toolSummaries[1]}`;
+              } else {
+                finalContent = `\u2713 ${toolSummaries.slice(0, -1).join(", ")}, and ${toolSummaries[toolSummaries.length - 1]}`;
+              }
+            } else {
+              finalContent = "\u2713 Done";
+            }
+            newEntries.reverse();
+          } else if (!finalContent) {
+            finalContent = "Done";
+          }
           const finalEntry = {
             type: "assistant",
-            content: assistantMessage.content || "I understand, but I don't have a specific response.",
+            content: finalContent,
             timestamp: /* @__PURE__ */ new Date()
           };
           this.chatHistory.push(finalEntry);
@@ -8920,6 +8990,7 @@ Current working directory: ${process.cwd()}`
     let toolRounds = 0;
     let totalOutputTokens = 0;
     let lastTokenUpdate = 0;
+    const allToolCalls = [];
     try {
       while (toolRounds < maxToolRounds) {
         if (this.abortController?.signal.aborted) {
@@ -8991,9 +9062,45 @@ Current working directory: ${process.cwd()}`
             }
           }
         }
+        let finalContent = accumulatedMessage.content?.trim();
+        if ((!finalContent || finalContent === "Using tools to help you...") && accumulatedMessage.tool_calls?.length > 0) {
+          const toolSummaries = accumulatedMessage.tool_calls.map((tc) => {
+            try {
+              const args = JSON.parse(tc.function.arguments);
+              const fileName = args.path || args.file_path;
+              const baseName = fileName ? fileName.split("/").pop() : "";
+              switch (tc.function.name) {
+                case "create_file":
+                  return baseName ? `Created ${baseName}` : "Created file";
+                case "str_replace_editor":
+                  return baseName ? `Updated ${baseName}` : "Updated file";
+                case "view_file":
+                  return baseName ? `Read ${baseName}` : "Read file";
+                case "bash":
+                  const cmd = args.command?.split(" ")[0] || "command";
+                  return `Ran ${cmd}`;
+                case "search":
+                  return `Searched for "${args.query?.substring(0, 20)}${args.query?.length > 20 ? "..." : ""}"`;
+                default:
+                  return tc.function.name.replace(/_/g, " ");
+              }
+            } catch {
+              return tc.function.name.replace(/_/g, " ");
+            }
+          });
+          if (toolSummaries.length === 1) {
+            finalContent = `\u2713 ${toolSummaries[0]}`;
+          } else if (toolSummaries.length === 2) {
+            finalContent = `\u2713 ${toolSummaries[0]} and ${toolSummaries[1]}`;
+          } else {
+            finalContent = `\u2713 ${toolSummaries.slice(0, -1).join(", ")}, and ${toolSummaries[toolSummaries.length - 1]}`;
+          }
+        } else if (!finalContent) {
+          finalContent = "Done";
+        }
         const assistantEntry = {
           type: "assistant",
-          content: accumulatedMessage.content || "Using tools to help you...",
+          content: finalContent,
           timestamp: /* @__PURE__ */ new Date(),
           toolCalls: accumulatedMessage.tool_calls || void 0
         };
@@ -9005,6 +9112,7 @@ Current working directory: ${process.cwd()}`
         });
         if (accumulatedMessage.tool_calls?.length > 0) {
           toolRounds++;
+          allToolCalls.push(...accumulatedMessage.tool_calls);
           if (!toolCallsYielded) {
             yield {
               type: "tool_calls",
@@ -9066,6 +9174,54 @@ Current working directory: ${process.cwd()}`
             tokenCount: inputTokens + totalOutputTokens
           };
         } else {
+          let completionMessage = accumulatedMessage.content?.trim();
+          console.error(`[DEBUG] No more tool calls. allToolCalls.length=${allToolCalls.length}, completionMessage="${completionMessage}"`);
+          if (!completionMessage && allToolCalls.length > 0) {
+            console.error(`[DEBUG] Generating completion message from ${allToolCalls.length} tool calls`);
+            const toolSummaries = allToolCalls.map((tc) => {
+              try {
+                const args = JSON.parse(tc.function.arguments);
+                const fileName = args.path || args.file_path;
+                const baseName = fileName ? fileName.split("/").pop() : "";
+                switch (tc.function.name) {
+                  case "create_file":
+                    return baseName ? `Created ${baseName}` : "Created file";
+                  case "str_replace_editor":
+                    return baseName ? `Updated ${baseName}` : "Updated file";
+                  case "view_file":
+                    return baseName ? `Read ${baseName}` : "Read file";
+                  case "bash":
+                    return "Ran command";
+                  default:
+                    return "Completed " + tc.function.name.replace(/_/g, " ");
+                }
+              } catch {
+                return "Completed " + tc.function.name.replace(/_/g, " ");
+              }
+            });
+            if (toolSummaries.length === 1) {
+              completionMessage = `\u2713 ${toolSummaries[0]}`;
+            } else if (toolSummaries.length === 2) {
+              completionMessage = `\u2713 ${toolSummaries[0]} and ${toolSummaries[1]}`;
+            } else {
+              completionMessage = `\u2713 ${toolSummaries.slice(0, -1).join(", ")}, and ${toolSummaries[toolSummaries.length - 1]}`;
+            }
+          }
+          if (completionMessage) {
+            console.error(`[DEBUG] Yielding completion message: "${completionMessage}"`);
+            const completionEntry = {
+              type: "assistant",
+              content: completionMessage,
+              timestamp: /* @__PURE__ */ new Date()
+            };
+            this.chatHistory.push(completionEntry);
+            yield {
+              type: "completion",
+              content: completionMessage
+            };
+          } else {
+            console.error(`[DEBUG] No completion message to yield (completionMessage is empty)`);
+          }
           break;
         }
       }
@@ -16585,7 +16741,12 @@ marked.setOptions({
   })
 });
 function MarkdownRenderer({ content }) {
-  return /* @__PURE__ */ jsx(Text, { children: content });
+  try {
+    const rendered = marked(content);
+    return /* @__PURE__ */ jsx(Text, { children: rendered });
+  } catch (error) {
+    return /* @__PURE__ */ jsx(Text, { children: content });
+  }
 }
 var MemoizedChatEntry = React3.memo(
   ({ entry, index }) => {
@@ -16619,15 +16780,14 @@ var MemoizedChatEntry = React3.memo(
     switch (entry.type) {
       case "user":
         const displayText = entry.isPasteSummary ? entry.displayContent || entry.content : entry.content;
-        const textColor = entry.isPasteSummary ? "cyan" : "gray";
-        return /* @__PURE__ */ jsx(Box, { flexDirection: "column", marginTop: 1, children: /* @__PURE__ */ jsx(Box, { children: /* @__PURE__ */ jsxs(Text, { color: textColor, children: [
-          ">",
-          " ",
-          displayText
+        const textColor = entry.isPasteSummary ? "cyan" : "white";
+        return /* @__PURE__ */ jsx(Box, { flexDirection: "column", marginTop: 1, marginBottom: 1, children: /* @__PURE__ */ jsx(Box, { paddingX: 1, borderStyle: "round", borderColor: "blue", paddingY: 0, children: /* @__PURE__ */ jsxs(Box, { children: [
+          /* @__PURE__ */ jsx(Text, { color: "blue", bold: true, children: "\u276F " }),
+          /* @__PURE__ */ jsx(Text, { color: textColor, children: displayText })
         ] }) }) }, index);
       case "assistant":
-        return /* @__PURE__ */ jsx(Box, { flexDirection: "column", marginTop: 1, children: /* @__PURE__ */ jsxs(Box, { flexDirection: "row", alignItems: "flex-start", children: [
-          /* @__PURE__ */ jsx(Text, { color: "white", children: "\u23FA " }),
+        return /* @__PURE__ */ jsx(Box, { flexDirection: "column", marginTop: 1, marginBottom: 1, children: /* @__PURE__ */ jsx(Box, { paddingX: 1, borderStyle: "round", borderColor: "green", paddingY: 0, children: /* @__PURE__ */ jsxs(Box, { flexDirection: "row", alignItems: "flex-start", children: [
+          /* @__PURE__ */ jsx(Text, { color: "green", bold: true, children: "\u2713 " }),
           /* @__PURE__ */ jsxs(Box, { flexDirection: "column", flexGrow: 1, children: [
             entry.toolCalls || entry.isStreaming ? (
               // If there are tool calls or streaming, just show plain text
@@ -16636,9 +16796,9 @@ var MemoizedChatEntry = React3.memo(
               // If no tool calls and not streaming, render as markdown
               /* @__PURE__ */ jsx(MarkdownRenderer, { content: entry.content })
             ),
-            entry.isStreaming && /* @__PURE__ */ jsx(Text, { color: "cyan", children: "\u2588" })
+            entry.isStreaming && /* @__PURE__ */ jsx(Text, { color: "cyan", bold: true, children: "\u2588" })
           ] })
-        ] }) }, index);
+        ] }) }) }, index);
       case "tool_call":
       case "tool_result":
         const getToolActionName = (toolName2) => {
@@ -16803,15 +16963,14 @@ function ChatInput({
       borderColor,
       paddingX: 1,
       paddingY: 0,
-      marginTop: 1,
       children: /* @__PURE__ */ jsxs(Box, { children: [
-        /* @__PURE__ */ jsx(Text, { color: promptColor, children: "\u276F " }),
+        /* @__PURE__ */ jsx(Text, { color: promptColor, bold: true, children: "\u276F " }),
         isPlaceholder ? /* @__PURE__ */ jsxs(Fragment, { children: [
           /* @__PURE__ */ jsx(Text, { color: "gray", dimColor: true, children: placeholderText }),
-          showCursor && /* @__PURE__ */ jsx(Text, { backgroundColor: "white", color: "black", children: " " })
+          showCursor && /* @__PURE__ */ jsx(Text, { backgroundColor: "cyan", color: "black", children: " " })
         ] }) : /* @__PURE__ */ jsxs(Text, { children: [
           beforeCursor,
-          showCursor && /* @__PURE__ */ jsx(Text, { backgroundColor: "white", color: "black", children: cursorChar }),
+          showCursor && /* @__PURE__ */ jsx(Text, { backgroundColor: "cyan", color: "black", children: cursorChar }),
           !showCursor && cursorChar !== " " && cursorChar,
           afterCursorText
         ] })
@@ -16819,7 +16978,7 @@ function ChatInput({
     }
   );
 }
-function ConfirmationDialog({
+var ConfirmationDialog = React3.memo(function ConfirmationDialog2({
   operation,
   filename,
   onConfirm,
@@ -16830,12 +16989,15 @@ function ConfirmationDialog({
   const [selectedOption, setSelectedOption] = useState(0);
   const [feedbackMode, setFeedbackMode] = useState(false);
   const [feedback, setFeedback] = useState("");
-  const options = [
-    "Yes",
-    "Yes, and don't ask again this session",
-    "No",
-    "No, with feedback"
-  ];
+  const options = useMemo(
+    () => [
+      "Yes",
+      "Yes, and don't ask again this session",
+      "No",
+      "No, with feedback"
+    ],
+    []
+  );
   useInput((input, key) => {
     if (feedbackMode) {
       if (key.return) {
@@ -16902,8 +17064,8 @@ function ConfirmationDialog({
       )
     ] });
   }
-  return /* @__PURE__ */ jsxs(Box, { flexDirection: "column", children: [
-    /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsxs(Box, { children: [
+  return /* @__PURE__ */ jsxs(Box, { flexDirection: "column", paddingX: 1, borderStyle: "round", borderColor: "yellow", children: [
+    /* @__PURE__ */ jsx(Box, { marginTop: 0, children: /* @__PURE__ */ jsxs(Box, { children: [
       /* @__PURE__ */ jsx(Text, { color: "magenta", children: "\u23FA" }),
       /* @__PURE__ */ jsxs(Text, { color: "white", children: [
         " ",
@@ -16914,30 +17076,22 @@ function ConfirmationDialog({
       ] })
     ] }) }),
     /* @__PURE__ */ jsxs(Box, { marginLeft: 2, flexDirection: "column", children: [
-      /* @__PURE__ */ jsx(Text, { color: "gray", children: "\u23BF Requesting user confirmation" }),
+      /* @__PURE__ */ jsx(Text, { color: "yellow", bold: true, children: "\u23BF Requesting user confirmation" }),
       showVSCodeOpen && /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: "gray", children: "\u23BF Opened changes in Visual Studio Code \u29C9" }) }),
-      content && /* @__PURE__ */ jsxs(Fragment, { children: [
-        /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
-          "\u23BF ",
-          content.split("\n")[0]
-        ] }),
-        /* @__PURE__ */ jsx(Box, { marginLeft: 4, flexDirection: "column", children: /* @__PURE__ */ jsx(
-          DiffRenderer,
-          {
-            diffContent: content,
-            filename,
-            terminalWidth: 80
-          }
-        ) })
-      ] })
+      content && /* @__PURE__ */ jsx(Box, { marginTop: 1, flexDirection: "column", children: /* @__PURE__ */ jsxs(Text, { color: "gray", dimColor: true, children: [
+        "Preview: ",
+        content.substring(0, 100),
+        content.length > 100 && "..."
+      ] }) })
     ] }),
     /* @__PURE__ */ jsxs(Box, { flexDirection: "column", marginTop: 1, children: [
-      /* @__PURE__ */ jsx(Box, { marginBottom: 1, children: /* @__PURE__ */ jsx(Text, { children: "Do you want to proceed with this operation?" }) }),
+      /* @__PURE__ */ jsx(Box, { marginBottom: 1, children: /* @__PURE__ */ jsx(Text, { bold: true, children: "Do you want to proceed with this operation?" }) }),
       /* @__PURE__ */ jsx(Box, { flexDirection: "column", children: options.map((option, index) => /* @__PURE__ */ jsx(Box, { paddingLeft: 1, children: /* @__PURE__ */ jsxs(
         Text,
         {
           color: selectedOption === index ? "black" : "white",
           backgroundColor: selectedOption === index ? "cyan" : void 0,
+          bold: selectedOption === index,
           children: [
             index + 1,
             ". ",
@@ -16948,7 +17102,8 @@ function ConfirmationDialog({
       /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: "gray", dimColor: true, children: "\u2191\u2193 navigate \u2022 Enter select \u2022 Esc cancel" }) })
     ] })
   ] });
-}
+});
+var confirmation_dialog_default = ConfirmationDialog;
 function ContextStatus({
   workspaceFiles = 0,
   indexSize = "0 MB",
@@ -17608,6 +17763,7 @@ function ChatInterfaceWithAgent({
           const flushUpdates = () => {
             const now = Date.now();
             if (now - lastUpdateTime < 250) return;
+            if (confirmationOptions) return;
             setChatHistory((prev) => {
               let newHistory = [...prev];
               if (accumulatedContent) {
@@ -17646,9 +17802,34 @@ function ChatInterfaceWithAgent({
                 }
                 streamingEntry = null;
                 pendingToolCalls.forEach((toolCall) => {
+                  let description = "Executing...";
+                  try {
+                    const args = JSON.parse(toolCall.function.arguments);
+                    switch (toolCall.function.name) {
+                      case "create_file":
+                        description = `Creating file: ${args.path || args.file_path}`;
+                        break;
+                      case "str_replace_editor":
+                        description = `Editing file: ${args.path || args.file_path}`;
+                        break;
+                      case "view_file":
+                        description = `Reading file: ${args.path || args.file_path}`;
+                        break;
+                      case "bash":
+                        description = `Running command: ${args.command?.substring(0, 60)}${args.command?.length > 60 ? "..." : ""}`;
+                        break;
+                      case "search":
+                        description = `Searching for: ${args.query}`;
+                        break;
+                      default:
+                        description = `Using ${toolCall.function.name}`;
+                    }
+                  } catch {
+                    description = `Using ${toolCall.function.name}`;
+                  }
                   const toolCallEntry = {
                     type: "tool_call",
-                    content: "Executing...",
+                    content: description,
                     timestamp: /* @__PURE__ */ new Date(),
                     toolCall
                   };
@@ -17665,10 +17846,17 @@ function ChatInterfaceWithAgent({
                     (result) => entry.type === "tool_call" && entry.toolCall?.id === result.toolCall.id
                   );
                   if (matchingResult) {
+                    let resultContent = "";
+                    if (matchingResult.toolResult.success) {
+                      const output = matchingResult.toolResult.output || "";
+                      resultContent = output.length > 200 ? output.substring(0, 200) + "..." : output || "\u2713 Success";
+                    } else {
+                      resultContent = `\u2717 Error: ${matchingResult.toolResult.error || "Unknown error"}`;
+                    }
                     return {
                       ...entry,
                       type: "tool_result",
-                      content: matchingResult.toolResult.success ? matchingResult.toolResult.output || "Success" : matchingResult.toolResult.error || "Error occurred",
+                      content: resultContent,
                       toolResult: matchingResult.toolResult
                     };
                   }
@@ -17691,6 +17879,19 @@ function ChatInterfaceWithAgent({
               case "content":
                 if (chunk.content) {
                   accumulatedContent += chunk.content;
+                }
+                break;
+              case "completion":
+                if (chunk.content) {
+                  flushUpdates();
+                  setChatHistory((prev) => [
+                    ...prev,
+                    {
+                      type: "assistant",
+                      content: chunk.content,
+                      timestamp: /* @__PURE__ */ new Date()
+                    }
+                  ]);
                 }
                 break;
               case "token_count":
@@ -17755,6 +17956,7 @@ function ChatInterfaceWithAgent({
     };
   }, [confirmationService]);
   useEffect(() => {
+    if (confirmationOptions) return;
     if (!isProcessing && !isStreaming) {
       setProcessingTime(0);
       return;
@@ -17768,39 +17970,43 @@ function ChatInterfaceWithAgent({
       );
     }, 1e3);
     return () => clearInterval(interval);
-  }, [isProcessing, isStreaming]);
+  }, [isProcessing, isStreaming, confirmationOptions]);
   const handleConfirmation = useCallback(
     (dontAskAgain) => {
-      confirmationService.confirmOperation(true, dontAskAgain);
-      setConfirmationOptions(null);
+      setTimeout(() => {
+        confirmationService.confirmOperation(true, dontAskAgain);
+        setConfirmationOptions(null);
+      }, 0);
     },
     [confirmationService]
   );
   const handleRejection = useCallback(
     (feedback) => {
-      confirmationService.rejectOperation(feedback);
-      setConfirmationOptions(null);
-      setIsProcessing(false);
-      setIsStreaming(false);
-      setTokenCount(0);
-      setProcessingTime(0);
-      processingStartTime.current = 0;
+      setTimeout(() => {
+        confirmationService.rejectOperation(feedback);
+        setConfirmationOptions(null);
+        setIsProcessing(false);
+        setIsStreaming(false);
+        setTokenCount(0);
+        setProcessingTime(0);
+        processingStartTime.current = 0;
+      }, 0);
     },
     [confirmationService]
   );
   const toggleContextTooltip = useCallback(() => {
     setShowContextTooltip((prev) => !prev);
   }, []);
-  return /* @__PURE__ */ jsxs(Box, { flexDirection: "column", paddingX: 2, children: [
-    chatHistory.length === 0 && !confirmationOptions && /* @__PURE__ */ jsxs(Box, { flexDirection: "column", children: [
+  return /* @__PURE__ */ jsxs(Box, { flexDirection: "column", paddingX: 2, height: "100%", children: [
+    chatHistory.length === 0 && !confirmationOptions && /* @__PURE__ */ jsxs(Box, { flexDirection: "column", marginBottom: 1, children: [
       /* @__PURE__ */ jsx(Banner, {}),
-      /* @__PURE__ */ jsxs(Box, { marginTop: 1, flexDirection: "column", children: [
-        /* @__PURE__ */ jsx(Text, { color: "cyan", bold: true, children: "\u{1F4A1} Quick Start Tips:" }),
+      /* @__PURE__ */ jsx(Box, { marginTop: 1, paddingX: 1, borderStyle: "round", borderColor: "cyan", children: /* @__PURE__ */ jsxs(Box, { flexDirection: "column", children: [
+        /* @__PURE__ */ jsx(Text, { color: "cyan", bold: true, children: "\u{1F4A1} Quick Start" }),
         /* @__PURE__ */ jsxs(Box, { marginTop: 1, flexDirection: "column", children: [
           /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
             "\u2022 ",
             /* @__PURE__ */ jsx(Text, { color: "yellow", children: "Ask anything:" }),
-            ' "Create a React component" or "Debug this Python script"'
+            ' "Create a React component"'
           ] }),
           /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
             "\u2022 ",
@@ -17809,102 +18015,76 @@ function ChatInterfaceWithAgent({
           ] }),
           /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
             "\u2022 ",
-            /* @__PURE__ */ jsx(Text, { color: "yellow", children: "Run commands:" }),
-            ' "Set up a new Node.js project"'
+            /* @__PURE__ */ jsx(Text, { color: "yellow", children: "Commands:" }),
+            ' Type "/help" for all commands'
+          ] })
+        ] }),
+        /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: "cyan", bold: true, children: "\u{1F6E0}\uFE0F Power Features" }) }),
+        /* @__PURE__ */ jsxs(Box, { marginTop: 1, flexDirection: "column", children: [
+          /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
+            "\u2022 ",
+            /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Auto-edit:" }),
+            " Shift+Tab for hands-free editing"
           ] }),
           /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
             "\u2022 ",
-            /* @__PURE__ */ jsx(Text, { color: "yellow", children: "Get help:" }),
-            ' Type "/help" for all commands'
+            /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Context:" }),
+            " Ctrl+I for workspace insights"
+          ] }),
+          /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
+            "\u2022 ",
+            /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Custom behavior:" }),
+            " Create .grok/GROK.md"
           ] })
         ] })
-      ] }),
-      /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(Text, { color: "cyan", bold: true, children: "\u{1F6E0}\uFE0F Power Features:" }) }),
-      /* @__PURE__ */ jsxs(Box, { marginTop: 1, flexDirection: "column", children: [
-        /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
-          "\u2022 ",
-          /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Auto-edit mode:" }),
-          " Press Shift+Tab to toggle hands-free editing"
-        ] }),
-        /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
-          "\u2022 ",
-          /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Project memory:" }),
-          " Create .grok/GROK.md to customize behavior"
-        ] }),
-        /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
-          "\u2022 ",
-          /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Documentation:" }),
-          ' Run "/init-agent" for .agent docs system'
-        ] }),
-        /* @__PURE__ */ jsxs(Text, { color: "gray", children: [
-          "\u2022 ",
-          /* @__PURE__ */ jsx(Text, { color: "magenta", children: "Error recovery:" }),
-          ' Run "/heal" after errors to add guardrails'
-        ] })
-      ] })
+      ] }) })
     ] }),
-    /* @__PURE__ */ jsx(Box, { flexDirection: "column", marginBottom: 1, children: /* @__PURE__ */ jsx(Text, { color: "gray", children: "Type your request in natural language. Ctrl+C to clear, 'exit' to quit." }) }),
-    /* @__PURE__ */ jsx(Box, { flexDirection: "column", ref: scrollRef, children: /* @__PURE__ */ jsx(
-      ChatHistory,
-      {
-        entries: chatHistory,
-        isConfirmationActive: !!confirmationOptions
-      }
-    ) }),
-    /* @__PURE__ */ jsx(
-      ContextTooltip,
-      {
-        isVisible: showContextTooltip,
-        onToggle: toggleContextTooltip
-      }
-    ),
-    confirmationOptions && /* @__PURE__ */ jsx(
-      ConfirmationDialog,
-      {
-        operation: confirmationOptions.operation,
-        filename: confirmationOptions.filename,
-        showVSCodeOpen: confirmationOptions.showVSCodeOpen,
-        content: confirmationOptions.content,
-        onConfirm: handleConfirmation,
-        onReject: handleRejection
-      }
-    ),
-    /* @__PURE__ */ jsxs(Box, { flexShrink: 0, marginTop: 1, children: [
-      /* @__PURE__ */ jsxs(
-        Box,
+    /* @__PURE__ */ jsxs(Box, { flexDirection: "column", flexGrow: 1, children: [
+      !confirmationOptions && /* @__PURE__ */ jsx(Box, { flexDirection: "column", ref: scrollRef, children: /* @__PURE__ */ jsx(
+        ChatHistory,
         {
-          borderStyle: "single",
-          borderColor: "gray",
-          paddingX: 1,
-          paddingY: 0.5,
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          children: [
-            /* @__PURE__ */ jsx(Text, { dimColor: true, children: "Ask me anything..." }),
-            /* @__PURE__ */ jsxs(Box, { flexDirection: "row", alignItems: "center", children: [
-              /* @__PURE__ */ jsxs(Text, { dimColor: true, children: [
-                "auto-edit: ",
-                autoEditEnabled ? "on" : "off",
-                " (shift + tab)"
-              ] }),
-              /* @__PURE__ */ jsx(Text, { dimColor: true, children: " \u224B grok-code-fast-1" }),
-              /* @__PURE__ */ jsx(Text, { dimColor: true, children: " Plan Mode: Off" })
-            ] })
-          ]
+          entries: chatHistory,
+          isConfirmationActive: false
+        }
+      ) }),
+      /* @__PURE__ */ jsx(
+        ContextTooltip,
+        {
+          isVisible: showContextTooltip,
+          onToggle: toggleContextTooltip
         }
       ),
-      /* @__PURE__ */ jsx(
-        ChatInput,
-        {
-          input: input || "",
-          isProcessing,
-          isStreaming,
-          cursorPosition: cursorPosition || 0
-        }
-      )
+      confirmationOptions && /* @__PURE__ */ jsxs(Box, { flexDirection: "column", children: [
+        /* @__PURE__ */ jsx(Box, { flexDirection: "column", children: /* @__PURE__ */ jsx(
+          ChatHistory,
+          {
+            entries: chatHistory,
+            isConfirmationActive: true
+          }
+        ) }),
+        /* @__PURE__ */ jsx(Box, { marginTop: 1, children: /* @__PURE__ */ jsx(
+          confirmation_dialog_default,
+          {
+            operation: confirmationOptions.operation,
+            filename: confirmationOptions.filename,
+            showVSCodeOpen: confirmationOptions.showVSCodeOpen,
+            content: confirmationOptions.content,
+            onConfirm: handleConfirmation,
+            onReject: handleRejection
+          }
+        ) })
+      ] }, "confirmation-dialog")
     ] }),
-    /* @__PURE__ */ jsxs(
+    !confirmationOptions && /* @__PURE__ */ jsx(Box, { flexShrink: 0, marginTop: 1, children: /* @__PURE__ */ jsx(
+      ChatInput,
+      {
+        input: input || "",
+        isProcessing,
+        isStreaming,
+        cursorPosition: cursorPosition || 0
+      }
+    ) }),
+    !confirmationOptions && /* @__PURE__ */ jsxs(
       Box,
       {
         width: "100%",
@@ -17933,12 +18113,18 @@ function ChatInterfaceWithAgent({
               " msgs"
             ] })
           ] }),
-          /* @__PURE__ */ jsx(Text, { dimColor: true, children: "MCP: Ready" })
+          /* @__PURE__ */ jsxs(Box, { flexDirection: "row", alignItems: "center", children: [
+            /* @__PURE__ */ jsxs(Text, { dimColor: true, children: [
+              "auto-edit: ",
+              autoEditEnabled ? "on" : "off"
+            ] }),
+            /* @__PURE__ */ jsx(Text, { dimColor: true, children: " \u2502 grok-code-fast-1" }),
+            /* @__PURE__ */ jsx(Text, { dimColor: true, children: " \u2502 MCP: Ready" })
+          ] })
         ]
       }
     ),
-    isProcessing && /* @__PURE__ */ jsx(LoadingSpinner, {}),
-    /* @__PURE__ */ jsx(Text, { dimColor: true, children: "Plan Mode: Off" })
+    isProcessing && !confirmationOptions && /* @__PURE__ */ jsx(LoadingSpinner, {})
   ] });
 }
 function ChatInterface({

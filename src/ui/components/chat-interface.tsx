@@ -69,6 +69,9 @@ function ChatInterfaceWithAgent({
 
   const confirmationService = ConfirmationService.getInstance();
 
+  // Disable input handler completely when confirmation is active to prevent flicker
+  const inputHandlerEnabled = !confirmationOptions;
+  
   const {
     input,
     cursorPosition,
@@ -211,6 +214,9 @@ function ChatInterfaceWithAgent({
             const now = Date.now();
             if (now - lastUpdateTime < 250) return; // Throttle updates to prevent display corruption
 
+            // Don't update if confirmation is active to prevent flicker
+            if (confirmationOptions) return;
+
             // Batch all chat history updates into a single setState call
             setChatHistory((prev) => {
               let newHistory = [...prev];
@@ -258,11 +264,38 @@ function ChatInterfaceWithAgent({
                 }
                 streamingEntry = null;
 
-                // Add individual tool call entries
+                // Add individual tool call entries with descriptive messages
                 pendingToolCalls.forEach((toolCall) => {
+                  // Parse arguments to create descriptive message
+                  let description = "Executing...";
+                  try {
+                    const args = JSON.parse(toolCall.function.arguments);
+                    switch (toolCall.function.name) {
+                      case "create_file":
+                        description = `Creating file: ${args.path || args.file_path}`;
+                        break;
+                      case "str_replace_editor":
+                        description = `Editing file: ${args.path || args.file_path}`;
+                        break;
+                      case "view_file":
+                        description = `Reading file: ${args.path || args.file_path}`;
+                        break;
+                      case "bash":
+                        description = `Running command: ${args.command?.substring(0, 60)}${args.command?.length > 60 ? '...' : ''}`;
+                        break;
+                      case "search":
+                        description = `Searching for: ${args.query}`;
+                        break;
+                      default:
+                        description = `Using ${toolCall.function.name}`;
+                    }
+                  } catch {
+                    description = `Using ${toolCall.function.name}`;
+                  }
+                  
                   const toolCallEntry: ChatEntry = {
                     type: "tool_call",
-                    content: "Executing...",
+                    content: description,
                     timestamp: new Date(),
                     toolCall: toolCall,
                   };
@@ -284,12 +317,22 @@ function ChatInterfaceWithAgent({
                       entry.toolCall?.id === result.toolCall.id,
                   );
                   if (matchingResult) {
+                    // Create descriptive result message
+                    let resultContent = "";
+                    if (matchingResult.toolResult.success) {
+                      const output = matchingResult.toolResult.output || "";
+                      // Show first 200 chars of output for visibility
+                      resultContent = output.length > 200 
+                        ? output.substring(0, 200) + "..." 
+                        : output || "✓ Success";
+                    } else {
+                      resultContent = `✗ Error: ${matchingResult.toolResult.error || "Unknown error"}`;
+                    }
+                    
                     return {
                       ...entry,
                       type: "tool_result",
-                      content: matchingResult.toolResult.success
-                        ? matchingResult.toolResult.output || "Success"
-                        : matchingResult.toolResult.error || "Error occurred",
+                      content: resultContent,
                       toolResult: matchingResult.toolResult,
                     };
                   }
@@ -317,6 +360,21 @@ function ChatInterfaceWithAgent({
               case "content":
                 if (chunk.content) {
                   accumulatedContent += chunk.content;
+                }
+                break;
+
+              case "completion":
+                // Completion message - create a new assistant entry immediately
+                if (chunk.content) {
+                  flushUpdates(); // Flush any pending updates first
+                  setChatHistory((prev) => [
+                    ...prev,
+                    {
+                      type: "assistant",
+                      content: chunk.content!,
+                      timestamp: new Date(),
+                    },
+                  ]);
                 }
                 break;
 
@@ -383,6 +441,7 @@ function ChatInterfaceWithAgent({
 
   useEffect(() => {
     const handleConfirmationRequest = (options: ConfirmationOptions) => {
+      // Batch state update to prevent flicker
       setConfirmationOptions(options);
     };
 
@@ -397,6 +456,9 @@ function ChatInterfaceWithAgent({
   }, [confirmationService]);
 
   useEffect(() => {
+    // Don't update processing time during confirmation to prevent flicker
+    if (confirmationOptions) return;
+    
     if (!isProcessing && !isStreaming) {
       setProcessingTime(0);
       return;
@@ -413,27 +475,33 @@ function ChatInterfaceWithAgent({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isProcessing, isStreaming]);
+  }, [isProcessing, isStreaming, confirmationOptions]);
 
   const handleConfirmation = useCallback(
     (dontAskAgain?: boolean) => {
-      confirmationService.confirmOperation(true, dontAskAgain);
-      setConfirmationOptions(null);
+      // Use setTimeout to avoid state update during render
+      setTimeout(() => {
+        confirmationService.confirmOperation(true, dontAskAgain);
+        setConfirmationOptions(null);
+      }, 0);
     },
     [confirmationService],
   );
 
   const handleRejection = useCallback(
     (feedback?: string) => {
-      confirmationService.rejectOperation(feedback);
-      setConfirmationOptions(null);
+      // Use setTimeout to avoid state update during render
+      setTimeout(() => {
+        confirmationService.rejectOperation(feedback);
+        setConfirmationOptions(null);
 
-      // Reset processing states when operation is cancelled
-      setIsProcessing(false);
-      setIsStreaming(false);
-      setTokenCount(0);
-      setProcessingTime(0);
-      processingStartTime.current = 0;
+        // Reset processing states when operation is cancelled
+        setIsProcessing(false);
+        setIsStreaming(false);
+        setTokenCount(0);
+        setProcessingTime(0);
+        processingStartTime.current = 0;
+      }, 0);
     },
     [confirmationService],
   );
@@ -443,120 +511,90 @@ function ChatInterfaceWithAgent({
   }, []);
 
   return (
-    <Box flexDirection="column" paddingX={2}>
+    <Box flexDirection="column" paddingX={2} height="100%">
       {/* Show enhanced banner only when no chat history and no confirmation dialog */}
       {chatHistory.length === 0 && !confirmationOptions && (
-        <Box flexDirection="column">
+        <Box flexDirection="column" marginBottom={1}>
           <Banner />
-          <Box marginTop={1} flexDirection="column">
-            <Text color="cyan" bold>
-              💡 Quick Start Tips:
-            </Text>
-            <Box marginTop={1} flexDirection="column">
-              <Text color="gray">
-                • <Text color="yellow">Ask anything:</Text> "Create a React
-                component" or "Debug this Python script"
+          <Box marginTop={1} paddingX={1} borderStyle="round" borderColor="cyan">
+            <Box flexDirection="column">
+              <Text color="cyan" bold>
+                💡 Quick Start
               </Text>
-              <Text color="gray">
-                • <Text color="yellow">Edit files:</Text> "Add error handling to
-                app.js"
-              </Text>
-              <Text color="gray">
-                • <Text color="yellow">Run commands:</Text> "Set up a new
-                Node.js project"
-              </Text>
-              <Text color="gray">
-                • <Text color="yellow">Get help:</Text> Type "/help" for all
-                commands
-              </Text>
+              <Box marginTop={1} flexDirection="column">
+                <Text color="gray">
+                  • <Text color="yellow">Ask anything:</Text> "Create a React component"
+                </Text>
+                <Text color="gray">
+                  • <Text color="yellow">Edit files:</Text> "Add error handling to app.js"
+                </Text>
+                <Text color="gray">
+                  • <Text color="yellow">Commands:</Text> Type "/help" for all commands
+                </Text>
+              </Box>
+
+              <Box marginTop={1}>
+                <Text color="cyan" bold>
+                  🛠️ Power Features
+                </Text>
+              </Box>
+              <Box marginTop={1} flexDirection="column">
+                <Text color="gray">
+                  • <Text color="magenta">Auto-edit:</Text> Shift+Tab for hands-free editing
+                </Text>
+                <Text color="gray">
+                  • <Text color="magenta">Context:</Text> Ctrl+I for workspace insights
+                </Text>
+                <Text color="gray">
+                  • <Text color="magenta">Custom behavior:</Text> Create .grok/GROK.md
+                </Text>
+              </Box>
             </Box>
           </Box>
-
-          <Box marginTop={1}>
-            <Text color="cyan" bold>
-              🛠️ Power Features:
-            </Text>
-          </Box>
-          <Box marginTop={1} flexDirection="column">
-            <Text color="gray">
-              • <Text color="magenta">Auto-edit mode:</Text> Press Shift+Tab to
-              toggle hands-free editing
-            </Text>
-            <Text color="gray">
-              • <Text color="magenta">Project memory:</Text> Create
-              .grok/GROK.md to customize behavior
-            </Text>
-            <Text color="gray">
-              • <Text color="magenta">Documentation:</Text> Run "/init-agent"
-              for .agent docs system
-            </Text>
-            <Text color="gray">
-              • <Text color="magenta">Error recovery:</Text> Run "/heal" after
-              errors to add guardrails
-            </Text>
-          </Box>
         </Box>
       )}
 
-      <Box flexDirection="column" marginBottom={1}>
-        <Text color="gray">
-          Type your request in natural language. Ctrl+C to clear, 'exit' to
-          quit.
-        </Text>
-      </Box>
-
-      <Box flexDirection="column" ref={scrollRef}>
-        <ChatHistory
-          entries={chatHistory}
-          isConfirmationActive={!!confirmationOptions}
-        />
-      </Box>
-
-      {/* Context Tooltip */}
-      <ContextTooltip
-        isVisible={showContextTooltip}
-        onToggle={toggleContextTooltip}
-      />
-
-      {/* Show confirmation dialog if one is pending */}
-      {confirmationOptions && (
-        <ConfirmationDialog
-          operation={confirmationOptions.operation}
-          filename={confirmationOptions.filename}
-          showVSCodeOpen={confirmationOptions.showVSCodeOpen}
-          content={confirmationOptions.content}
-          onConfirm={handleConfirmation}
-          onReject={handleRejection}
-        />
-      )}
-
-      {/* Input area */}
-      <Box flexShrink={0} marginTop={1}>
-        <Box
-          borderStyle="single"
-          borderColor="gray"
-          paddingX={1}
-          paddingY={0.5}
-          flexDirection="row"
-          justifyContent="space-between"
-          alignItems="center"
-        >
-          <Text dimColor>Ask me anything...</Text>
-          <Box flexDirection="row" alignItems="center">
-            <Text dimColor>
-              auto-edit: {autoEditEnabled ? "on" : "off"} (shift + tab)
-            </Text>
-            <Text dimColor> ≋ grok-code-fast-1</Text>
-            <Text dimColor> Plan Mode: Off</Text>
+      {/* Chat history and confirmation dialog - freeze during confirmation */}
+      <Box flexDirection="column" flexGrow={1}>
+        {!confirmationOptions && (
+          <Box flexDirection="column" ref={scrollRef}>
+            <ChatHistory
+              entries={chatHistory}
+              isConfirmationActive={false}
+            />
           </Box>
-        </Box>
-        <ChatInput
-          input={input || ""}
-          isProcessing={isProcessing}
-          isStreaming={isStreaming}
-          cursorPosition={cursorPosition || 0}
+        )}
+
+        {/* Context Tooltip */}
+        <ContextTooltip
+          isVisible={showContextTooltip}
+          onToggle={toggleContextTooltip}
         />
+
+        {/* Show confirmation dialog if one is pending - single stable render */}
+        {confirmationOptions && (
+          <Box flexDirection="column" key="confirmation-dialog">
+            {/* Show chat history frozen in background */}
+            <Box flexDirection="column">
+              <ChatHistory
+                entries={chatHistory}
+                isConfirmationActive={true}
+              />
+            </Box>
+            <Box marginTop={1}>
+              <ConfirmationDialog
+                operation={confirmationOptions.operation}
+                filename={confirmationOptions.filename}
+                showVSCodeOpen={confirmationOptions.showVSCodeOpen}
+                content={confirmationOptions.content}
+                onConfirm={handleConfirmation}
+                onReject={handleRejection}
+              />
+            </Box>
+          </Box>
+        )}
       </Box>
+
 
       {/* Command suggestions overlay */}
       {/* Command suggestions overlay - disabled for now */}
@@ -577,35 +615,52 @@ function ChatInterfaceWithAgent({
         />
       )} */}
 
-      {/* Bottom status bar */}
-      <Box
-        width="100%"
-        flexDirection="row"
-        justifyContent="space-between"
-        paddingTop={1}
-        paddingBottom={0.5}
-        borderStyle="single"
-        borderColor="gray"
-      >
-        <Box flexDirection="row" flexWrap="wrap">
-          <Text dimColor>🧠 </Text>
-          <Text dimColor>
-            {tokenCount}/128000 ({Math.round((tokenCount / 128000) * 100)}%)
-          </Text>
-          <Text dimColor>
-            {" "}
-            │ 📁 {contextInfo?.workspaceFiles || 0} files │ 💬{" "}
-            {chatHistory.length} msgs
-          </Text>
+      {/* Input area - hide during confirmation to prevent flicker */}
+      {!confirmationOptions && (
+        <Box flexShrink={0} marginTop={1}>
+          <ChatInput
+            input={input || ""}
+            isProcessing={isProcessing}
+            isStreaming={isStreaming}
+            cursorPosition={cursorPosition || 0}
+          />
         </Box>
-        <Text dimColor>MCP: Ready</Text>
-      </Box>
+      )}
 
-      {/* Show loading spinner when processing */}
-      {isProcessing && <LoadingSpinner />}
+      {/* Bottom status bar - hide during confirmation to prevent flicker */}
+      {!confirmationOptions && (
+        <Box
+          width="100%"
+          flexDirection="row"
+          justifyContent="space-between"
+          paddingTop={1}
+          paddingBottom={0.5}
+          borderStyle="single"
+          borderColor="gray"
+        >
+          <Box flexDirection="row" flexWrap="wrap">
+            <Text dimColor>🧠 </Text>
+            <Text dimColor>
+              {tokenCount}/128000 ({Math.round((tokenCount / 128000) * 100)}%)
+            </Text>
+            <Text dimColor>
+              {" "}
+              │ 📁 {contextInfo?.workspaceFiles || 0} files │ 💬{" "}
+              {chatHistory.length} msgs
+            </Text>
+          </Box>
+          <Box flexDirection="row" alignItems="center">
+            <Text dimColor>
+              auto-edit: {autoEditEnabled ? "on" : "off"}
+            </Text>
+            <Text dimColor> │ grok-code-fast-1</Text>
+            <Text dimColor> │ MCP: Ready</Text>
+          </Box>
+        </Box>
+      )}
 
-      {/* Plan mode indicator - simplified */}
-      <Text dimColor>Plan Mode: Off</Text>
+      {/* Show loading spinner when processing - hide during confirmation */}
+      {isProcessing && !confirmationOptions && <LoadingSpinner />}
     </Box>
   );
 }

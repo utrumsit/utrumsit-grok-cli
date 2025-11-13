@@ -51,7 +51,7 @@ export interface ChatEntry {
 }
 
 export interface StreamingChunk {
-  type: "content" | "tool_calls" | "tool_result" | "done" | "token_count";
+  type: "content" | "tool_calls" | "tool_result" | "done" | "token_count" | "completion";
   content?: string;
   toolCalls?: GrokToolCall[];
   toolCall?: GrokToolCall;
@@ -201,10 +201,12 @@ If a user rejects an operation, the tool will return an error and you should not
 Be helpful, direct, and efficient. Always explain what you're doing and show the results.
 
 IMPORTANT RESPONSE GUIDELINES:
-- After using tools, do NOT respond with pleasantries like "Thanks for..." or "Great!"
-- Only provide necessary explanations or next steps if relevant to the task
-- Keep responses concise and focused on the actual work being done
-- If a tool execution completes the user's request, you can remain silent or give a brief confirmation
+- After using tools, ALWAYS provide a brief summary of what was accomplished
+- Example: "Created eric.py with the requested code" or "Updated config.json with new settings"
+- Do NOT use generic messages like "Using tools to help you..."
+- Do NOT respond with pleasantries like "Thanks for..." or "Great!"
+- Keep responses concise and focused on the actual work being done (1-2 sentences max)
+- Your final message should clearly state what action was completed
 
 Current working directory: ${process.cwd()}`,
     });
@@ -300,10 +302,40 @@ Current working directory: ${process.cwd()}`,
         ) {
           toolRounds++;
 
+          // Generate smart fallback message if needed
+          let assistantContent = assistantMessage.content?.trim();
+          if (!assistantContent && assistantMessage.tool_calls?.length > 0) {
+            const toolSummaries = assistantMessage.tool_calls.map((tc: any) => {
+              try {
+                const args = JSON.parse(tc.function.arguments);
+                const fileName = args.path || args.file_path;
+                const baseName = fileName ? fileName.split('/').pop() : '';
+                
+                switch (tc.function.name) {
+                  case "create_file":
+                    return baseName ? `Creating ${baseName}` : "Creating file";
+                  case "str_replace_editor":
+                    return baseName ? `Updating ${baseName}` : "Updating file";
+                  case "view_file":
+                    return baseName ? `Reading ${baseName}` : "Reading file";
+                  case "bash":
+                    return "Running command";
+                  default:
+                    return tc.function.name.replace(/_/g, ' ');
+                }
+              } catch {
+                return tc.function.name.replace(/_/g, ' ');
+              }
+            });
+            assistantContent = toolSummaries.join(", ") + "...";
+          } else if (!assistantContent) {
+            assistantContent = "Working on it...";
+          }
+          
           // Add assistant message with tool calls
           const assistantEntry: ChatEntry = {
             type: "assistant",
-            content: assistantMessage.content || "Using tools to help you...",
+            content: assistantContent,
             timestamp: new Date(),
             toolCalls: assistantMessage.tool_calls,
           };
@@ -382,12 +414,57 @@ Current working directory: ${process.cwd()}`,
               : { search_parameters: { mode: "off" } }
           );
         } else {
-          // No more tool calls, add final response
+          // No more tool calls - this is the final response
+          let finalContent = assistantMessage.content?.trim();
+          
+          // If empty, generate completion message from previous tool calls
+          if (!finalContent && toolRounds > 0) {
+            // Look back at the last tool calls to generate a summary
+            const lastAssistantWithTools = newEntries.reverse().find(
+              (e) => e.type === "assistant" && e.toolCalls
+            );
+            if (lastAssistantWithTools?.toolCalls) {
+              const toolSummaries = lastAssistantWithTools.toolCalls.map((tc: any) => {
+                try {
+                  const args = JSON.parse(tc.function.arguments);
+                  const fileName = args.path || args.file_path;
+                  const baseName = fileName ? fileName.split('/').pop() : '';
+                  
+                  switch (tc.function.name) {
+                    case "create_file":
+                      return baseName ? `Created ${baseName}` : "Created file";
+                    case "str_replace_editor":
+                      return baseName ? `Updated ${baseName}` : "Updated file";
+                    case "view_file":
+                      return baseName ? `Read ${baseName}` : "Read file";
+                    case "bash":
+                      return "Ran command";
+                    default:
+                      return "Completed " + tc.function.name.replace(/_/g, ' ');
+                  }
+                } catch {
+                  return "Completed " + tc.function.name.replace(/_/g, ' ');
+                }
+              });
+              
+              if (toolSummaries.length === 1) {
+                finalContent = `✓ ${toolSummaries[0]}`;
+              } else if (toolSummaries.length === 2) {
+                finalContent = `✓ ${toolSummaries[0]} and ${toolSummaries[1]}`;
+              } else {
+                finalContent = `✓ ${toolSummaries.slice(0, -1).join(", ")}, and ${toolSummaries[toolSummaries.length - 1]}`;
+              }
+            } else {
+              finalContent = "✓ Done";
+            }
+            newEntries.reverse(); // Restore order
+          } else if (!finalContent) {
+            finalContent = "Done";
+          }
+          
           const finalEntry: ChatEntry = {
             type: "assistant",
-            content:
-              assistantMessage.content ||
-              "I understand, but I don't have a specific response.",
+            content: finalContent,
             timestamp: new Date(),
           };
           this.chatHistory.push(finalEntry);
@@ -481,6 +558,7 @@ Current working directory: ${process.cwd()}`,
     let toolRounds = 0;
     let totalOutputTokens = 0;
     let lastTokenUpdate = 0;
+    const allToolCalls: GrokToolCall[] = []; // Track all tools used
 
     try {
       // Agent loop - continue until no more tool calls or max rounds reached
@@ -581,10 +659,54 @@ Current working directory: ${process.cwd()}`,
         }
       }
 
+        // Generate better default message based on tool calls
+        let finalContent = accumulatedMessage.content?.trim();
+        
+        // If content is empty or generic, generate a better summary from tool calls
+        if ((!finalContent || finalContent === "Using tools to help you...") && accumulatedMessage.tool_calls?.length > 0) {
+          // Create a summary of what tools were used
+          const toolSummaries = accumulatedMessage.tool_calls.map((tc: any) => {
+            try {
+              const args = JSON.parse(tc.function.arguments);
+              const fileName = args.path || args.file_path;
+              const baseName = fileName ? fileName.split('/').pop() : '';
+              
+              switch (tc.function.name) {
+                case "create_file":
+                  return baseName ? `Created ${baseName}` : "Created file";
+                case "str_replace_editor":
+                  return baseName ? `Updated ${baseName}` : "Updated file";
+                case "view_file":
+                  return baseName ? `Read ${baseName}` : "Read file";
+                case "bash":
+                  const cmd = args.command?.split(' ')[0] || 'command';
+                  return `Ran ${cmd}`;
+                case "search":
+                  return `Searched for "${args.query?.substring(0, 20)}${args.query?.length > 20 ? '...' : ''}"`;
+                default:
+                  return tc.function.name.replace(/_/g, ' ');
+              }
+            } catch {
+              return tc.function.name.replace(/_/g, ' ');
+            }
+          });
+          
+          // Create natural language summary
+          if (toolSummaries.length === 1) {
+            finalContent = `✓ ${toolSummaries[0]}`;
+          } else if (toolSummaries.length === 2) {
+            finalContent = `✓ ${toolSummaries[0]} and ${toolSummaries[1]}`;
+          } else {
+            finalContent = `✓ ${toolSummaries.slice(0, -1).join(", ")}, and ${toolSummaries[toolSummaries.length - 1]}`;
+          }
+        } else if (!finalContent) {
+          finalContent = "Done";
+        }
+        
         // Add assistant entry to history
         const assistantEntry: ChatEntry = {
           type: "assistant",
-          content: accumulatedMessage.content || "Using tools to help you...",
+          content: finalContent,
           timestamp: new Date(),
           toolCalls: accumulatedMessage.tool_calls || undefined,
         };
@@ -601,6 +723,9 @@ Current working directory: ${process.cwd()}`,
         if (accumulatedMessage.tool_calls?.length > 0) {
           toolRounds++;
 
+          // Track these tool calls
+          allToolCalls.push(...accumulatedMessage.tool_calls);
+          
           // Only yield tool_calls if we haven't already yielded them during streaming
           if (!toolCallsYielded) {
             yield {
@@ -686,7 +811,65 @@ Current working directory: ${process.cwd()}`,
 
           // Continue the loop to get the next response (which might have more tool calls)
         } else {
-          // No tool calls, we're done
+          // No tool calls - generate and yield final completion message
+          let completionMessage = accumulatedMessage.content?.trim();
+          
+          // If the model didn't provide a completion message, generate one from ALL tool calls
+          console.error(`[DEBUG] No more tool calls. allToolCalls.length=${allToolCalls.length}, completionMessage="${completionMessage}"`);
+          if (!completionMessage && allToolCalls.length > 0) {
+              console.error(`[DEBUG] Generating completion message from ${allToolCalls.length} tool calls`);
+              const toolSummaries = allToolCalls.map((tc: any) => {
+                try {
+                  const args = JSON.parse(tc.function.arguments);
+                  const fileName = args.path || args.file_path;
+                  const baseName = fileName ? fileName.split('/').pop() : '';
+                  
+                  switch (tc.function.name) {
+                    case "create_file":
+                      return baseName ? `Created ${baseName}` : "Created file";
+                    case "str_replace_editor":
+                      return baseName ? `Updated ${baseName}` : "Updated file";
+                    case "view_file":
+                      return baseName ? `Read ${baseName}` : "Read file";
+                    case "bash":
+                      return "Ran command";
+                    default:
+                      return "Completed " + tc.function.name.replace(/_/g, ' ');
+                  }
+                } catch {
+                  return "Completed " + tc.function.name.replace(/_/g, ' ');
+                }
+              });
+              
+              if (toolSummaries.length === 1) {
+                completionMessage = `✓ ${toolSummaries[0]}`;
+              } else if (toolSummaries.length === 2) {
+                completionMessage = `✓ ${toolSummaries[0]} and ${toolSummaries[1]}`;
+              } else {
+                completionMessage = `✓ ${toolSummaries.slice(0, -1).join(", ")}, and ${toolSummaries[toolSummaries.length - 1]}`;
+              }
+          }
+          
+          // Add completion message as a new assistant entry and yield it
+          if (completionMessage) {
+            console.error(`[DEBUG] Yielding completion message: "${completionMessage}"`);
+            const completionEntry: ChatEntry = {
+              type: "assistant",
+              content: completionMessage,
+              timestamp: new Date(),
+            };
+            this.chatHistory.push(completionEntry);
+            
+            // Yield as completion type for the UI
+            yield {
+              type: "completion",
+              content: completionMessage,
+            };
+          } else {
+            console.error(`[DEBUG] No completion message to yield (completionMessage is empty)`);
+          }
+          
+          // Done - exit loop
           break;
         }
       }
